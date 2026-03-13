@@ -1,4 +1,4 @@
-export type Modality = 'llm' | 'image' | 'video' | 'tts';
+export type Modality = 'llm' | 'image' | 'video' | 'tts' | 'stt' | 'music' | 'embedding';
 
 export type ModelStatus = 'installed' | 'available' | 'downloading' | 'running' | 'error';
 
@@ -227,4 +227,22 @@ export interface NoosphereConfig {
     tts?: number;
   };
   onUsage?: (usage: UsageEvent) => void | Promise<void>;
+}
+
+export interface TranscriptionOptions extends BaseOptions {
+  audio: string; // file path
+  language?: string;
+  task?: 'transcribe' | 'translate';
+}
+
+export interface TranscriptionResult {
+  text: string;
+  language: string;
+  duration: number;
+  segments?: Array<{ start: number; end: number; text: string }>;
+}
+
+export interface MusicOptions extends BaseOptions {
+  prompt: string;
+  duration?: number;
 }

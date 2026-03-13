@@ -47,13 +47,52 @@ export class ComfyUIProvider implements NoosphereProvider {
   }
 
   async listModels(modality?: Modality): Promise<ModelInfo[]> {
+    const models: ModelInfo[] = [];
+    const logo = getProviderLogo('comfyui');
+
+    // Try to fetch installed models dynamically from ComfyUI
     try {
-      const res = await fetch(`${this.baseUrl}/object_info`);
-      if (!res.ok) return [];
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 5000);
+      try {
+        const res = await fetch(`${this.baseUrl}/object_info`, { signal: controller.signal });
+        if (res.ok) {
+          const objectInfo = await res.json() as Record<string, any>;
 
-      const models: ModelInfo[] = [];
+          // Extract checkpoint models from CheckpointLoaderSimple
+          const ckptNode = objectInfo?.['CheckpointLoaderSimple'];
+          const ckptNames: string[] = ckptNode?.input?.required?.ckpt_name?.[0] ?? [];
+          for (const name of ckptNames) {
+            if (modality && modality !== 'image') continue;
+            models.push({
+              id: `comfyui-ckpt-${name}`, provider: 'comfyui', name: `ComfyUI: ${name}`,
+              modality: 'image', local: true, cost: { price: 0, unit: 'free' }, logo,
+              status: 'installed',
+              localInfo: { sizeBytes: 0, runtime: 'comfyui' },
+              capabilities: { maxWidth: 2048, maxHeight: 2048, supportsNegativePrompt: true },
+            });
+          }
 
-      const logo = getProviderLogo('comfyui');
+          // Extract LoRA models
+          const loraNode = objectInfo?.['LoraLoader'];
+          const loraNames: string[] = loraNode?.input?.required?.lora_name?.[0] ?? [];
+          for (const name of loraNames) {
+            if (modality && modality !== 'image') continue;
+            models.push({
+              id: `comfyui-lora-${name}`, provider: 'comfyui', name: `LoRA: ${name}`,
+              modality: 'image', local: true, cost: { price: 0, unit: 'free' }, logo,
+              status: 'installed',
+              localInfo: { sizeBytes: 0, runtime: 'comfyui' },
+            });
+          }
+        }
+      } finally {
+        clearTimeout(timer);
+      }
+    } catch { /* ComfyUI not running or unreachable */ }
+
+    // If no dynamic models found, add generic entries
+    if (models.length === 0) {
       if (!modality || modality === 'image') {
         models.push({
           id: 'comfyui-txt2img', provider: 'comfyui', name: 'ComfyUI Text-to-Image',
@@ -68,11 +107,41 @@ export class ComfyUIProvider implements NoosphereProvider {
           capabilities: { maxDuration: 10, supportsImageToVideo: true },
         });
       }
-
-      return models;
-    } catch {
-      return [];
     }
+
+    // Fetch CivitAI catalog (available models)
+    if (!modality || modality === 'image') {
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 5000);
+        try {
+          const res = await fetch(
+            'https://civitai.com/api/v1/models?types=Checkpoint&sort=Highest%20Rated&limit=50&nsfw=false',
+            { signal: controller.signal },
+          );
+          if (res.ok) {
+            const data = await res.json() as { items?: any[] };
+            for (const item of data.items ?? []) {
+              const version = item.modelVersions?.[0];
+              models.push({
+                id: `civitai-${item.id}`, provider: 'comfyui',
+                name: item.name ?? `CivitAI Model ${item.id}`,
+                modality: 'image', local: true, cost: { price: 0, unit: 'free' }, logo,
+                status: 'available',
+                localInfo: {
+                  sizeBytes: version?.files?.[0]?.sizeKB ? version.files[0].sizeKB * 1024 : 0,
+                  runtime: 'comfyui',
+                },
+              });
+            }
+          }
+        } finally {
+          clearTimeout(timer);
+        }
+      } catch { /* CivitAI unreachable */ }
+    }
+
+    return models;
   }
 
   async image(options: ImageOptions): Promise<NoosphereResult> {

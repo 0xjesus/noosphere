@@ -27,6 +27,10 @@ import { ComfyUIProvider } from './providers/comfyui.js';
 import { LocalTTSProvider } from './providers/local-tts.js';
 import { HuggingFaceProvider } from './providers/huggingface.js';
 import { OllamaProvider } from './providers/ollama.js';
+import { HfLocalProvider } from './providers/hf-local.js';
+import { WhisperLocalProvider } from './providers/whisper-local.js';
+import { AudioCraftProvider } from './providers/audiocraft.js';
+import { OpenAICompatProvider, detectOpenAICompatServers } from './providers/openai-compat.js';
 
 export class Noosphere {
   private config: ResolvedConfig;
@@ -357,6 +361,29 @@ export class Noosphere {
             }
           }
         })(),
+        // HuggingFace local model catalog
+        (async () => {
+          this.registry.addProvider(new HfLocalProvider());
+        })(),
+        // Whisper local STT
+        (async () => {
+          const whisper = new WhisperLocalProvider();
+          const ok = await whisper.ping();
+          if (ok) this.registry.addProvider(whisper);
+        })(),
+        // AudioCraft local music generation
+        (async () => {
+          const audiocraft = new AudioCraftProvider();
+          const ok = await audiocraft.ping();
+          if (ok) this.registry.addProvider(audiocraft);
+        })(),
+        // Auto-detect OpenAI-compatible servers
+        (async () => {
+          const servers = await detectOpenAICompatServers();
+          for (const server of servers) {
+            this.registry.addProvider(server);
+          }
+        })(),
       ]);
     }
   }
@@ -370,7 +397,7 @@ export class Noosphere {
 
     // 2. Check defaults if no preference
     if (!preferredId) {
-      const defaultCfg = this.config.defaults[modality];
+      const defaultCfg = (this.config.defaults as Record<string, { provider: string; model: string } | undefined>)[modality];
       if (defaultCfg) {
         preferredId = defaultCfg.provider;
       }

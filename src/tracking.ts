@@ -34,7 +34,7 @@ export class UsageTracker {
     }
 
     const byProvider: Record<string, number> = {};
-    const byModality: Record<Modality, number> = { llm: 0, image: 0, video: 0, tts: 0 };
+    const byModality: Record<Modality, number> = { llm: 0, image: 0, video: 0, tts: 0, stt: 0, music: 0, embedding: 0 };
     let totalCost = 0;
 
     for (const event of filtered) {
