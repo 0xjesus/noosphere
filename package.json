@@ -1,6 +1,6 @@
 {
   "name": "noosphere",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Unified AI creation engine — text, image, video, audio across all providers",
   "type": "module",
   "main": "./dist/index.js",
