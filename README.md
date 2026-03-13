@@ -324,6 +324,111 @@ const imageModels = await ai.getModels('image');
 
 ---
 
+## Local Models — Run Everything on Your Machine (Coming Soon)
+
+Noosphere is building **comprehensive local model support** across all modalities — not just cloud APIs, but everything you can run on your own hardware.
+
+### The Vision
+
+```typescript
+const ai = new Noosphere();
+await ai.syncModels();
+
+// Everything you can run locally — installed or available to download
+const local = await ai.getModels({ local: true });
+// → 200+ models: Ollama LLMs, Diffusers image models, ComfyUI workflows, TTS, STT, Music...
+
+// What's installed vs what's available to download
+const installed = await ai.getModels({ local: true, status: 'installed' });
+const available = await ai.getModels({ local: true, status: 'available' });
+
+// Install a model from the web catalog
+await ai.installModel('ollama/deepseek-r1:14b');       // pulls from Ollama library
+await ai.installModel('hf/stabilityai/sd-turbo');       // downloads from HuggingFace
+await ai.installModel('comfyui/flux-schnell');           // downloads checkpoint for ComfyUI
+
+// Use it — same unified API as cloud models
+const result = await ai.chat({ model: 'deepseek-r1:14b', messages: [...] });
+const image = await ai.image({ model: 'flux-schnell', prompt: 'a cat in space' });
+const audio = await ai.speak({ model: 'kokoro/af_heart', text: 'Hello world' });
+const music = await ai.generate({ modality: 'music', model: 'musicgen-small', prompt: 'lo-fi beats' });
+const transcript = await ai.transcribe({ model: 'whisper-large-v3', audio: './recording.mp3' });
+```
+
+### Supported Local Runtimes
+
+| Runtime | LLM | Image | Video | TTS | STT | Music | Embeddings |
+|---|---|---|---|---|---|---|---|
+| **Ollama** | ✅ 215+ families | — | — | — | — | — | ✅ 10+ |
+| **Diffusers** (Python) | — | ✅ 1000+ | ✅ 50+ | ✅ Bark | — | ✅ AudioLDM | — |
+| **ComfyUI** | — | ✅ workflows | ✅ workflows | — | — | — | — |
+| **Piper** | — | — | — | ✅ 100+ voices | — | — | — |
+| **Kokoro** | — | — | — | ✅ multi-voice | — | — | — |
+| **Whisper** | — | — | — | — | ✅ 9 sizes | — | — |
+| **AudioCraft** | — | — | — | — | — | ✅ MusicGen | — |
+
+### Web Catalogs (Auto-Fetched)
+
+| Source | What it provides |
+|---|---|
+| **Ollama Library** (`ollama.com`) | 215+ LLM families with all tags, sizes, and quantizations |
+| **HuggingFace Models** (`huggingface.co/api`) | 100K+ models across all modalities, filtered by pipeline type |
+| **CivitAI** (`civitai.com/api`) | SD/SDXL/FLUX checkpoints, LoRAs, embeddings with previews |
+| **Piper Voices** (`huggingface.co/rhasspy`) | 100+ TTS voices in 30+ languages |
+
+### Hardware-Aware Recommendations
+
+Noosphere detects your GPU and recommends models that actually fit:
+
+```typescript
+const hw = await ai.getHardware();
+// → { gpu: 'NVIDIA RTX 2000 Ada', vramMB: 8188, compute: 'cuda' }
+
+const recommended = await ai.recommend('image');
+// → Models sorted by quality that fit in your 8GB VRAM:
+//   1. FLUX.1-schnell (FP8) — 6GB VRAM
+//   2. SD-Turbo — 4GB VRAM
+//   3. SDXL-Turbo — 6GB VRAM
+```
+
+### Model Lifecycle
+
+Every local model has a `status` and `localInfo`:
+
+```typescript
+{
+  id: 'llama3.3:70b',
+  provider: 'ollama',
+  status: 'installed',           // installed | available | downloading | running
+  local: true,
+  logo: { svg: 'https://...meta.svg', png: 'https://...meta.png' },
+  localInfo: {
+    sizeBytes: 42520413916,
+    family: 'llama',
+    parameterSize: '70.6B',
+    quantization: 'Q4_K_M',
+    format: 'gguf',
+    running: false,
+    vramRequired: 42000000000,
+  },
+}
+```
+
+### Implementation Roadmap
+
+| Phase | Scope | Status |
+|---|---|---|
+| **Phase 1** | Ollama Provider (local + web catalog, chat, install/uninstall) | 🔜 Next |
+| **Phase 2** | Diffusers Provider (image + video generation via Python bridge) | Planned |
+| **Phase 3** | ComfyUI Enhancement (dynamic model discovery, CivitAI catalog) | Planned |
+| **Phase 4** | Audio Suite (enhanced TTS, Whisper STT, MusicGen) | Planned |
+| **Phase 5** | Embeddings (Ollama embedding models) | Planned |
+| **Phase 6** | Model Manager (hardware detection, unified install, recommendations) | Planned |
+
+> 📄 **Full implementation plan:** [`docs/LOCAL_MODELS_PLAN.md`](./docs/LOCAL_MODELS_PLAN.md)
+
+---
+
 ## Configuration
 
 API keys are resolved from the constructor config or environment variables (config takes priority):
