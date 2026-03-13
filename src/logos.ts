@@ -1,30 +1,13 @@
 // src/logos.ts
-// Provider logos bundled as local assets (assets/logos/)
-// SVG + PNG (512x512) for each provider — official logos from brand pages.
-
-import { fileURLToPath } from 'url';
-import { dirname, join, resolve } from 'path';
-import { existsSync } from 'fs';
+// Provider logos served from DigitalOcean Spaces CDN.
+// SVG + PNG (512×512) for each provider.
 
 export interface ProviderLogo {
   svg?: string;
   png?: string;
 }
 
-// Resolve assets dir relative to this file (works in both ESM and CJS)
-let _assetsDir: string | null = null;
-function assetsDir(): string {
-  if (_assetsDir) return _assetsDir;
-  try {
-    // ESM
-    const __filename = fileURLToPath(import.meta.url);
-    _assetsDir = resolve(dirname(__filename), '..', 'assets', 'logos');
-  } catch {
-    // CJS fallback
-    _assetsDir = resolve(__dirname, '..', 'assets', 'logos');
-  }
-  return _assetsDir;
-}
+const CDN_BASE = 'https://blockchainstarter.nyc3.digitaloceanspaces.com/noosphere/logos';
 
 /**
  * All known provider IDs with logo assets.
@@ -49,24 +32,31 @@ export const PROVIDER_IDS = [
 
 export type ProviderId = (typeof PROVIDER_IDS)[number];
 
-// Cache resolved paths
+// Providers that have SVGs available
+const HAS_SVG = new Set<string>([
+  'openai', 'anthropic', 'google', 'groq', 'mistral', 'xai',
+  'openrouter', 'cerebras', 'huggingface', 'ollama',
+  'meta', 'deepseek', 'microsoft', 'nvidia', 'qwen',
+  'cohere', 'perplexity', 'amazon', 'baidu',
+  'together', 'fireworks-ai', 'replicate', 'nebius', 'novita',
+  // Sub-agent found additional SVGs
+  'comfyui', 'fal', 'kokoro', 'piper', 'sambanova', 'pi-ai', 'zai',
+]);
+
+// Cache
 const _cache = new Map<string, ProviderLogo>();
 
 /**
- * Get local file paths to a provider's logo assets.
- * Returns absolute paths to SVG and/or PNG files in assets/logos/.
+ * Get CDN URLs for a provider's logo.
  */
 export function getProviderLogo(providerId: string | undefined | null): ProviderLogo | undefined {
   if (!providerId) return undefined;
 
-  // Check cache
   const cached = _cache.get(providerId);
   if (cached) return cached;
 
-  // Normalize
   const normalized = providerId.toLowerCase().replace(/[-_\s]/g, '');
 
-  // Try exact match first, then fuzzy
   let matchedId: string | null = null;
   for (const id of PROVIDER_IDS) {
     if (id === providerId) { matchedId = id; break; }
@@ -79,15 +69,12 @@ export function getProviderLogo(providerId: string | undefined | null): Provider
 
   if (!matchedId) return undefined;
 
-  const dir = assetsDir();
-  const svgPath = join(dir, 'svg', `${matchedId}.svg`);
-  const pngPath = join(dir, 'png', `${matchedId}.png`);
-
-  const logo: ProviderLogo = {};
-  if (existsSync(svgPath)) logo.svg = svgPath;
-  if (existsSync(pngPath)) logo.png = pngPath;
-
-  if (!logo.svg && !logo.png) return undefined;
+  const logo: ProviderLogo = {
+    png: `${CDN_BASE}/png/${matchedId}.png`,
+  };
+  if (HAS_SVG.has(matchedId)) {
+    logo.svg = `${CDN_BASE}/svg/${matchedId}.svg`;
+  }
 
   _cache.set(providerId, logo);
   return logo;
@@ -105,7 +92,7 @@ export function getAllProviderLogos(): Record<string, ProviderLogo> {
   return result;
 }
 
-// For backwards compat — re-export as PROVIDER_LOGOS (lazy-loaded)
+// Backwards-compat lazy proxy
 let _allLogos: Record<string, ProviderLogo> | null = null;
 export const PROVIDER_LOGOS: Record<string, ProviderLogo> = new Proxy({} as Record<string, ProviderLogo>, {
   get(_, prop: string) {

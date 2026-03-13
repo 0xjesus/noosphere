@@ -65,29 +65,21 @@ Noosphere **automatically discovers the latest models from EVERY provider's API 
 
 ### Provider Logos — SVG & PNG for Every Model
 
-Every model returned by the auto-fetch includes a `logo` field with **absolute file paths** to the provider's official logo bundled in the package — SVG (vector) and PNG (512×512). No CDN dependencies, no external requests. For aggregator providers (OpenRouter, HuggingFace), logos are resolved to the **real upstream provider** — so an `x-ai/grok-4` model gets the xAI logo, not OpenRouter's.
+Every model returned by the auto-fetch includes a `logo` field with **CDN URLs** to the provider's official logo — SVG (vector) and PNG (512×512), hosted on DigitalOcean Spaces. For aggregator providers (OpenRouter, HuggingFace), logos are resolved to the **real upstream provider** — so an `x-ai/grok-4` model gets the xAI logo, not OpenRouter's.
 
 ```typescript
-import { readFileSync } from 'fs';
-
 const models = await ai.getModels('llm');
 
 for (const model of models) {
   console.log(model.id, model.logo);
-  // "gpt-5"          { svg: "/path/to/node_modules/noosphere/assets/logos/svg/openai.svg",
-  //                    png: "/path/to/node_modules/noosphere/assets/logos/png/openai.png" }
-  // "claude-opus-4-6" { svg: "/.../anthropic.svg", png: "/.../anthropic.png" }
-  // "gemini-2.5-pro"  { svg: "/.../google.svg", png: "/.../google.png" }
+  // "gpt-5"          { svg: "https://...cdn.../openai.svg", png: "https://...cdn.../openai.png" }
+  // "claude-opus-4-6" { svg: "https://...cdn.../anthropic.svg", png: "https://...cdn.../anthropic.png" }
+  // "gemini-2.5-pro"  { svg: "https://...cdn.../google.svg", png: "https://...cdn.../google.png" }
+}
 
-  // Read the file directly:
-  const svgContent = readFileSync(model.logo.svg, 'utf-8');
-  const pngBuffer = readFileSync(model.logo.png);
-
-  // Serve in Express:
-  // app.get('/logo/:provider.svg', (req, res) => res.sendFile(model.logo.svg));
-
-  // Use in React (copy to public/):
-  // <img src={`/logos/${model.provider}.svg`} alt={model.provider} />
+// Use directly in your UI:
+// <img src={model.logo.svg} alt={model.provider} />
+// <img src={model.logo.png} width={48} height={48} />;
 }
 
 // Providers also have logos:
@@ -112,7 +104,7 @@ You can also import the logo registry directly:
 import { getProviderLogo, PROVIDER_LOGOS, getAllProviderLogos } from 'noosphere';
 
 const logo = getProviderLogo('anthropic');
-// { svg: "/abs/path/to/anthropic.svg", png: "/abs/path/to/anthropic.png" }
+// { svg: "https://...cdn.../anthropic.svg", png: "https://...cdn.../anthropic.png" }
 
 // Get all logos as a map:
 const allLogos = getAllProviderLogos();
@@ -128,8 +120,8 @@ const qwen = hfModels.find(m => m.id === 'Qwen/Qwen2.5-72B-Instruct');
 
 console.log(qwen.capabilities.inferenceProviderLogos);
 // {
-//   "together": { svg: "/.../together.svg", png: "/.../together.png" },
-//   "fireworks-ai": { png: "/.../fireworks-ai.png" },
+//   "together": { svg: "https://...cdn.../together.svg", png: "https://...cdn.../together.png" },
+//   "fireworks-ai": { svg: "https://...cdn.../fireworks-ai.svg", png: "https://...cdn.../fireworks-ai.png" },
 // }
 ```
 
