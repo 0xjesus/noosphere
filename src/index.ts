@@ -20,5 +20,7 @@ export type {
   SyncResult,
   NoosphereErrorCode,
   LocalServiceConfig,
+  ProviderLogo,
 } from './types.js';
 export type { NoosphereProvider } from './providers/base.js';
+export { PROVIDER_LOGOS, getProviderLogo } from './logos.js';

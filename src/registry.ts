@@ -1,6 +1,7 @@
 // src/registry.ts
 import type { Modality, ModelInfo, ProviderInfo, SyncResult } from './types.js';
 import type { NoosphereProvider } from './providers/base.js';
+import { getProviderLogo } from './logos.js';
 
 interface CachedModels {
   models: ModelInfo[];
@@ -129,6 +130,7 @@ export class Registry {
         local: provider.isLocal,
         status: 'online', // ping-based status is set externally
         modelCount: cached?.models.length ?? 0,
+        logo: getProviderLogo(provider.id),
       });
     }
     return infos;

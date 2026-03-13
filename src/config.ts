@@ -1,5 +1,20 @@
 import type { NoosphereConfig, NoosphereErrorCode, LocalServiceConfig } from './types.js';
 
+// Load .env / .env.vault (dotenvx supports both plain and encrypted)
+// Falls back silently if dotenvx isn't installed — env vars from shell still work.
+let _envLoaded = false;
+function loadEnv(): void {
+  if (_envLoaded) return;
+  _envLoaded = true;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const dotenvx = require('@dotenvx/dotenvx');
+    dotenvx.config({ quiet: true });
+  } catch {
+    // dotenvx not available — no-op
+  }
+}
+
 const ENV_KEY_MAP: Record<string, string> = {
   openai: 'OPENAI_API_KEY',
   anthropic: 'ANTHROPIC_API_KEY',
@@ -38,6 +53,8 @@ export interface ResolvedConfig {
 }
 
 export function resolveConfig(input: NoosphereConfig): ResolvedConfig {
+  loadEnv();
+
   // Resolve API keys: config > env
   const keys: Record<string, string | undefined> = {};
   for (const [name, envVar] of Object.entries(ENV_KEY_MAP)) {

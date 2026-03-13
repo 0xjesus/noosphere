@@ -1,6 +1,7 @@
 // src/providers/comfyui.ts
 import type { NoosphereProvider } from './base.js';
 import type { Modality, ModelInfo, ImageOptions, VideoOptions, NoosphereResult } from '../types.js';
+import { getProviderLogo } from '../logos.js';
 
 interface ComfyUIConfig {
   host: string;
@@ -52,17 +53,18 @@ export class ComfyUIProvider implements NoosphereProvider {
 
       const models: ModelInfo[] = [];
 
+      const logo = getProviderLogo('comfyui');
       if (!modality || modality === 'image') {
         models.push({
           id: 'comfyui-txt2img', provider: 'comfyui', name: 'ComfyUI Text-to-Image',
-          modality: 'image', local: true, cost: { price: 0, unit: 'free' },
+          modality: 'image', local: true, cost: { price: 0, unit: 'free' }, logo,
           capabilities: { maxWidth: 2048, maxHeight: 2048, supportsNegativePrompt: true },
         });
       }
       if (!modality || modality === 'video') {
         models.push({
           id: 'comfyui-txt2vid', provider: 'comfyui', name: 'ComfyUI Text-to-Video',
-          modality: 'video', local: true, cost: { price: 0, unit: 'free' },
+          modality: 'video', local: true, cost: { price: 0, unit: 'free' }, logo,
           capabilities: { maxDuration: 10, supportsImageToVideo: true },
         });
       }

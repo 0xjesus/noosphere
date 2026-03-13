@@ -1,6 +1,7 @@
 // src/providers/local-tts.ts
 import type { NoosphereProvider } from './base.js';
 import type { Modality, ModelInfo, SpeakOptions, NoosphereResult } from '../types.js';
+import { getProviderLogo } from '../logos.js';
 
 interface LocalTTSConfig {
   id: string;
@@ -56,6 +57,7 @@ export class LocalTTSProvider implements NoosphereProvider {
         }
       }
 
+      const logo = getProviderLogo(this.id);
       return voices.map((v) => ({
         id: v.id,
         provider: this.id,
@@ -63,6 +65,7 @@ export class LocalTTSProvider implements NoosphereProvider {
         modality: 'tts' as const,
         local: true,
         cost: { price: 0, unit: 'free' },
+        logo,
         capabilities: { voices: voices.map((vv) => vv.id) },
       }));
     } catch {

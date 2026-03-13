@@ -76,6 +76,11 @@ export interface NoosphereStream extends AsyncIterable<StreamEvent> {
   abort(): void;
 }
 
+export interface ProviderLogo {
+  svg?: string;
+  png?: string;
+}
+
 export interface ModelInfo {
   id: string;
   provider: string;
@@ -83,6 +88,7 @@ export interface ModelInfo {
   modality: Modality;
   local: boolean;
   cost: { price: number; unit: string };
+  logo?: ProviderLogo;
   capabilities?: {
     contextWindow?: number;
     maxTokens?: number;
@@ -108,6 +114,7 @@ export interface ProviderInfo {
   local: boolean;
   status: 'online' | 'offline' | 'degraded';
   modelCount: number;
+  logo?: ProviderLogo;
 }
 
 export interface UsageEvent {

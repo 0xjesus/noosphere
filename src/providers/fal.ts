@@ -4,6 +4,7 @@ import type { NoosphereProvider } from './base.js';
 import type {
   Modality, ModelInfo, ImageOptions, VideoOptions, SpeakOptions, NoosphereResult,
 } from '../types.js';
+import { getProviderLogo } from '../logos.js';
 
 const FAL_PRICING_URL = 'https://api.fal.ai/v1/models/pricing';
 
@@ -48,6 +49,7 @@ export class FalProvider implements NoosphereProvider {
           modality: inferredModality,
           local: false,
           cost: { price: entry.price, unit: entry.unit },
+          logo: getProviderLogo('fal'),
         });
       }
       return models;
