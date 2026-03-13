@@ -65,38 +65,58 @@ Noosphere **automatically discovers the latest models from EVERY provider's API 
 
 ### Provider Logos — SVG & PNG for Every Model
 
-Every model returned by the auto-fetch includes a `logo` field with the provider's official logo in SVG and PNG formats. For aggregator providers (OpenRouter, HuggingFace), logos are resolved to the **real upstream provider** — so an `x-ai/grok-4` model gets the xAI logo, not OpenRouter's.
+Every model returned by the auto-fetch includes a `logo` field with **absolute file paths** to the provider's official logo bundled in the package — SVG (vector) and PNG (512×512). No CDN dependencies, no external requests. For aggregator providers (OpenRouter, HuggingFace), logos are resolved to the **real upstream provider** — so an `x-ai/grok-4` model gets the xAI logo, not OpenRouter's.
 
 ```typescript
+import { readFileSync } from 'fs';
+
 const models = await ai.getModels('llm');
 
 for (const model of models) {
   console.log(model.id, model.logo);
-  // "gpt-5" { svg: "https://cdn.simpleicons.org/openai", png: "https://cdn.brandfetch.io/.../icon.png" }
-  // "claude-opus-4-6" { svg: "https://cdn.simpleicons.org/anthropic", png: "https://cdn.brandfetch.io/.../icon.png" }
-  // "gemini-2.5-pro" { svg: "https://cdn.simpleicons.org/google", png: "https://cdn.brandfetch.io/.../icon.png" }
+  // "gpt-5"          { svg: "/path/to/node_modules/noosphere/assets/logos/svg/openai.svg",
+  //                    png: "/path/to/node_modules/noosphere/assets/logos/png/openai.png" }
+  // "claude-opus-4-6" { svg: "/.../anthropic.svg", png: "/.../anthropic.png" }
+  // "gemini-2.5-pro"  { svg: "/.../google.svg", png: "/.../google.png" }
+
+  // Read the file directly:
+  const svgContent = readFileSync(model.logo.svg, 'utf-8');
+  const pngBuffer = readFileSync(model.logo.png);
+
+  // Serve in Express:
+  // app.get('/logo/:provider.svg', (req, res) => res.sendFile(model.logo.svg));
+
+  // Use in React (copy to public/):
+  // <img src={`/logos/${model.provider}.svg`} alt={model.provider} />
 }
 
 // Providers also have logos:
 const providers = await ai.getProviders();
 providers.forEach(p => console.log(p.id, p.logo));
-
-// Use in your UI:
-// <img src={model.logo.svg} alt={model.provider} />
 ```
 
-**Covered providers:** OpenAI, Anthropic, Google, Groq, Mistral, xAI, OpenRouter, Cerebras, Meta, DeepSeek, Microsoft, NVIDIA, Qwen, Cohere, Perplexity, Amazon, FAL, HuggingFace, ComfyUI, Piper, Kokoro, Ollama, SambaNova, Together, Fireworks, Replicate, Nebius, Novita.
+**28 providers covered (23 SVG + 28 PNG):**
+
+| Provider | SVG | PNG | Source |
+|---|---|---|---|
+| OpenAI, Anthropic, Google, Groq, Mistral, xAI | ✓ | ✓ | Official brand assets |
+| OpenRouter, Cerebras, Meta, DeepSeek | ✓ | ✓ | Official brand assets |
+| Microsoft, NVIDIA, Qwen, Cohere, Perplexity | ✓ | ✓ | Official brand assets |
+| Amazon, Together, Fireworks, Replicate | ✓ | ✓ | Official brand assets |
+| HuggingFace, Ollama, Nebius, Novita | ✓ | ✓ | Official brand assets |
+| FAL, ComfyUI, Piper, Kokoro, SambaNova | ✗ | ✓ | GitHub avatars (512×512) |
 
 You can also import the logo registry directly:
 
 ```typescript
-import { getProviderLogo, PROVIDER_LOGOS } from 'noosphere';
+import { getProviderLogo, PROVIDER_LOGOS, getAllProviderLogos } from 'noosphere';
 
 const logo = getProviderLogo('anthropic');
-// { svg: "https://cdn.simpleicons.org/anthropic", png: "https://cdn.brandfetch.io/.../icon.png" }
+// { svg: "/abs/path/to/anthropic.svg", png: "/abs/path/to/anthropic.png" }
 
-// Or access the full map:
-console.log(Object.keys(PROVIDER_LOGOS));
+// Get all logos as a map:
+const allLogos = getAllProviderLogos();
+console.log(Object.keys(allLogos));
 // ['openai', 'anthropic', 'google', 'groq', 'mistral', 'xai', 'openrouter', ...]
 ```
 
@@ -108,8 +128,8 @@ const qwen = hfModels.find(m => m.id === 'Qwen/Qwen2.5-72B-Instruct');
 
 console.log(qwen.capabilities.inferenceProviderLogos);
 // {
-//   "together": { svg: "https://cdn.simpleicons.org/togetherai", png: "..." },
-//   "fireworks-ai": { png: "https://cdn.brandfetch.io/.../icon.png" },
+//   "together": { svg: "/.../together.svg", png: "/.../together.png" },
+//   "fireworks-ai": { png: "/.../fireworks-ai.png" },
 // }
 ```
 

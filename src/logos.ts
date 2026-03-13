@@ -1,150 +1,127 @@
 // src/logos.ts
-// Provider logo URLs (SVG + PNG) for UI display
+// Provider logos bundled as local assets (assets/logos/)
+// SVG + PNG (512x512) for each provider — official logos from brand pages.
+
+import { fileURLToPath } from 'url';
+import { dirname, join, resolve } from 'path';
+import { existsSync } from 'fs';
 
 export interface ProviderLogo {
   svg?: string;
   png?: string;
 }
 
+// Resolve assets dir relative to this file (works in both ESM and CJS)
+let _assetsDir: string | null = null;
+function assetsDir(): string {
+  if (_assetsDir) return _assetsDir;
+  try {
+    // ESM
+    const __filename = fileURLToPath(import.meta.url);
+    _assetsDir = resolve(dirname(__filename), '..', 'assets', 'logos');
+  } catch {
+    // CJS fallback
+    _assetsDir = resolve(__dirname, '..', 'assets', 'logos');
+  }
+  return _assetsDir;
+}
+
 /**
- * Known provider logos from official brand assets and CDNs.
- * Keys match provider IDs used throughout noosphere.
+ * All known provider IDs with logo assets.
  */
-export const PROVIDER_LOGOS: Record<string, ProviderLogo> = {
-  // --- Cloud LLM Providers ---
-  openai: {
-    svg: 'https://cdn.simpleicons.org/openai',
-    png: 'https://cdn.brandfetch.io/idR3duQxYl/w/512/h/512/theme/dark/icon.png',
-  },
-  anthropic: {
-    svg: 'https://cdn.simpleicons.org/anthropic',
-    png: 'https://cdn.brandfetch.io/id2S-kXbuM/w/512/h/512/theme/dark/icon.png',
-  },
-  google: {
-    svg: 'https://cdn.simpleicons.org/google',
-    png: 'https://cdn.brandfetch.io/id6O2oGzv-/w/512/h/512/theme/dark/icon.png',
-  },
-  groq: {
-    svg: 'https://cdn.simpleicons.org/groq',
-    png: 'https://cdn.brandfetch.io/idTEBPz5KO/w/512/h/512/theme/dark/icon.png',
-  },
-  mistral: {
-    svg: 'https://cdn.simpleicons.org/mistral',
-    png: 'https://cdn.brandfetch.io/idnBOFq5eF/w/512/h/512/theme/dark/icon.png',
-  },
-  xai: {
-    svg: 'https://cdn.simpleicons.org/x',
-    png: 'https://cdn.brandfetch.io/idS5WhqBbM/w/512/h/512/theme/dark/icon.png',
-  },
-  openrouter: {
-    svg: 'https://openrouter.ai/favicon.svg',
-    png: 'https://openrouter.ai/favicon.png',
-  },
-  cerebras: {
-    svg: 'https://cdn.simpleicons.org/cerebras',
-    png: 'https://cdn.brandfetch.io/idGa4PRFP0/w/512/h/512/theme/dark/icon.png',
-  },
+export const PROVIDER_IDS = [
+  // Cloud LLM
+  'openai', 'anthropic', 'google', 'groq', 'mistral', 'xai',
+  'openrouter', 'cerebras',
+  // Media
+  'fal', 'huggingface',
+  // Local
+  'comfyui', 'piper', 'kokoro', 'ollama',
+  // Model orgs (from OpenRouter prefixes)
+  'meta', 'deepseek', 'microsoft', 'nvidia', 'qwen',
+  'cohere', 'perplexity', 'amazon',
+  // HuggingFace inference providers
+  'sambanova', 'together', 'fireworks-ai', 'replicate', 'nebius', 'novita',
+] as const;
 
-  // --- Media Providers ---
-  fal: {
-    svg: 'https://fal.ai/favicon.svg',
-    png: 'https://fal.ai/favicon.png',
-  },
-  huggingface: {
-    svg: 'https://cdn.simpleicons.org/huggingface',
-    png: 'https://cdn.brandfetch.io/idnrPPHe87/w/512/h/512/theme/dark/icon.png',
-  },
+export type ProviderId = (typeof PROVIDER_IDS)[number];
 
-  // --- Local Providers ---
-  comfyui: {
-    svg: 'https://raw.githubusercontent.com/comfyanonymous/ComfyUI/master/web/assets/icon.svg',
-    png: 'https://raw.githubusercontent.com/comfyanonymous/ComfyUI/master/web/assets/icon.png',
-  },
-  piper: {
-    png: 'https://raw.githubusercontent.com/rhasspy/piper/master/logo.png',
-  },
-  kokoro: {
-    png: 'https://raw.githubusercontent.com/hexgrad/kokoro/main/assets/icon.png',
-  },
-  ollama: {
-    svg: 'https://cdn.simpleicons.org/ollama',
-    png: 'https://cdn.brandfetch.io/idtesMoSFj/w/512/h/512/theme/dark/icon.png',
-  },
-
-  // --- Model Org Providers (from OpenRouter model prefixes) ---
-  meta: {
-    svg: 'https://cdn.simpleicons.org/meta',
-    png: 'https://cdn.brandfetch.io/idmKk_rq7Y/w/512/h/512/theme/dark/icon.png',
-  },
-  deepseek: {
-    png: 'https://cdn.brandfetch.io/id1BWKUVWI/w/512/h/512/theme/dark/icon.png',
-  },
-  microsoft: {
-    svg: 'https://cdn.simpleicons.org/microsoft',
-    png: 'https://cdn.brandfetch.io/idchmboHEZ/w/512/h/512/theme/dark/icon.png',
-  },
-  nvidia: {
-    svg: 'https://cdn.simpleicons.org/nvidia',
-    png: 'https://cdn.brandfetch.io/id1JcGHuZN/w/512/h/512/theme/dark/icon.png',
-  },
-  qwen: {
-    png: 'https://img.alicdn.com/imgextra/i1/O1CN01BUp2gU1sRZigvazUo_!!6000000005764-2-tps-228-228.png',
-  },
-  cohere: {
-    svg: 'https://cdn.simpleicons.org/cohere',
-    png: 'https://cdn.brandfetch.io/idiDnz1fvB/w/512/h/512/theme/dark/icon.png',
-  },
-  perplexity: {
-    svg: 'https://cdn.simpleicons.org/perplexity',
-    png: 'https://cdn.brandfetch.io/idwWX3Neii/w/512/h/512/theme/dark/icon.png',
-  },
-  amazon: {
-    svg: 'https://cdn.simpleicons.org/amazonaws',
-    png: 'https://cdn.brandfetch.io/idawORoPJZ/w/512/h/512/theme/dark/icon.png',
-  },
-
-  // --- HuggingFace Inference Providers ---
-  'hf-inference': {
-    svg: 'https://cdn.simpleicons.org/huggingface',
-    png: 'https://cdn.brandfetch.io/idnrPPHe87/w/512/h/512/theme/dark/icon.png',
-  },
-  'sambanova': {
-    png: 'https://cdn.brandfetch.io/id__2e5yMY/w/512/h/512/theme/dark/icon.png',
-  },
-  'together': {
-    svg: 'https://cdn.simpleicons.org/togetherai',
-    png: 'https://cdn.brandfetch.io/idH5EoFVaH/w/512/h/512/theme/dark/icon.png',
-  },
-  'fireworks-ai': {
-    png: 'https://cdn.brandfetch.io/idj1VQ2O4C/w/512/h/512/theme/dark/icon.png',
-  },
-  'replicate': {
-    svg: 'https://cdn.simpleicons.org/replicate',
-    png: 'https://cdn.brandfetch.io/idWKE4rRaH/w/512/h/512/theme/dark/icon.png',
-  },
-  'nebius': {
-    png: 'https://cdn.brandfetch.io/idiUqSQ52b/w/512/h/512/theme/dark/icon.png',
-  },
-  'novita': {
-    png: 'https://novita.ai/favicon.png',
-  },
-};
+// Cache resolved paths
+const _cache = new Map<string, ProviderLogo>();
 
 /**
- * Get logo for a provider by its ID.
- * Tries exact match first, then case-insensitive partial match.
+ * Get local file paths to a provider's logo assets.
+ * Returns absolute paths to SVG and/or PNG files in assets/logos/.
  */
 export function getProviderLogo(providerId: string | undefined | null): ProviderLogo | undefined {
   if (!providerId) return undefined;
 
-  // Exact match
-  if (PROVIDER_LOGOS[providerId]) return PROVIDER_LOGOS[providerId];
+  // Check cache
+  const cached = _cache.get(providerId);
+  if (cached) return cached;
 
-  // Normalize: lowercase, strip common suffixes
+  // Normalize
   const normalized = providerId.toLowerCase().replace(/[-_\s]/g, '');
-  for (const [key, logo] of Object.entries(PROVIDER_LOGOS)) {
-    if (key.replace(/[-_\s]/g, '') === normalized) return logo;
+
+  // Try exact match first, then fuzzy
+  let matchedId: string | null = null;
+  for (const id of PROVIDER_IDS) {
+    if (id === providerId) { matchedId = id; break; }
+  }
+  if (!matchedId) {
+    for (const id of PROVIDER_IDS) {
+      if (id.replace(/[-_\s]/g, '') === normalized) { matchedId = id; break; }
+    }
   }
 
-  return undefined;
+  if (!matchedId) return undefined;
+
+  const dir = assetsDir();
+  const svgPath = join(dir, 'svg', `${matchedId}.svg`);
+  const pngPath = join(dir, 'png', `${matchedId}.png`);
+
+  const logo: ProviderLogo = {};
+  if (existsSync(svgPath)) logo.svg = svgPath;
+  if (existsSync(pngPath)) logo.png = pngPath;
+
+  if (!logo.svg && !logo.png) return undefined;
+
+  _cache.set(providerId, logo);
+  return logo;
 }
+
+/**
+ * Get all provider logos as a map.
+ */
+export function getAllProviderLogos(): Record<string, ProviderLogo> {
+  const result: Record<string, ProviderLogo> = {};
+  for (const id of PROVIDER_IDS) {
+    const logo = getProviderLogo(id);
+    if (logo) result[id] = logo;
+  }
+  return result;
+}
+
+// For backwards compat — re-export as PROVIDER_LOGOS (lazy-loaded)
+let _allLogos: Record<string, ProviderLogo> | null = null;
+export const PROVIDER_LOGOS: Record<string, ProviderLogo> = new Proxy({} as Record<string, ProviderLogo>, {
+  get(_, prop: string) {
+    if (!_allLogos) _allLogos = getAllProviderLogos();
+    return _allLogos[prop];
+  },
+  ownKeys() {
+    if (!_allLogos) _allLogos = getAllProviderLogos();
+    return Object.keys(_allLogos);
+  },
+  getOwnPropertyDescriptor(_, prop: string) {
+    if (!_allLogos) _allLogos = getAllProviderLogos();
+    if (prop in _allLogos) {
+      return { configurable: true, enumerable: true, value: _allLogos[prop] };
+    }
+    return undefined;
+  },
+  has(_, prop: string) {
+    if (!_allLogos) _allLogos = getAllProviderLogos();
+    return prop in _allLogos;
+  },
+});

@@ -23,4 +23,4 @@ export type {
   ProviderLogo,
 } from './types.js';
 export type { NoosphereProvider } from './providers/base.js';
-export { PROVIDER_LOGOS, getProviderLogo } from './logos.js';
+export { PROVIDER_LOGOS, getProviderLogo, getAllProviderLogos, PROVIDER_IDS } from './logos.js';
