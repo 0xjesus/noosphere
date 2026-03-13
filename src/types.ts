@@ -1,5 +1,21 @@
 export type Modality = 'llm' | 'image' | 'video' | 'tts';
 
+export type ModelStatus = 'installed' | 'available' | 'downloading' | 'running' | 'error';
+
+export interface LocalModelInfo {
+  sizeBytes: number;
+  family?: string;
+  parameterSize?: string;
+  quantization?: string;
+  format?: string;
+  digest?: string;
+  modifiedAt?: string;
+  running?: boolean;
+  vramRequired?: number;
+  diskPath?: string;
+  runtime: string;
+}
+
 export interface BaseOptions {
   provider?: string;
   model?: string;
@@ -89,6 +105,8 @@ export interface ModelInfo {
   local: boolean;
   cost: { price: number; unit: string };
   logo?: ProviderLogo;
+  status?: ModelStatus;
+  localInfo?: LocalModelInfo;
   capabilities?: {
     contextWindow?: number;
     maxTokens?: number;

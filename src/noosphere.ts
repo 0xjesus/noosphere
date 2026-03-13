@@ -26,6 +26,7 @@ import { FalProvider } from './providers/fal.js';
 import { ComfyUIProvider } from './providers/comfyui.js';
 import { LocalTTSProvider } from './providers/local-tts.js';
 import { HuggingFaceProvider } from './providers/huggingface.js';
+import { OllamaProvider } from './providers/ollama.js';
 
 export class Noosphere {
   private config: ResolvedConfig;
@@ -223,6 +224,34 @@ export class Noosphere {
     return this.tracker.getSummary(options);
   }
 
+  // --- Local Model Management ---
+
+  async installModel(name: string): Promise<AsyncGenerator<import('./providers/ollama.js').OllamaPullProgress>> {
+    if (!this.initialized) await this.init();
+    const provider = this.registry.getProvider('ollama') as OllamaProvider | undefined;
+    if (!provider) throw new NoosphereError('Ollama provider not available', { code: 'PROVIDER_UNAVAILABLE', provider: 'ollama', modality: 'llm' });
+    return provider.pullModel(name);
+  }
+
+  async uninstallModel(name: string): Promise<void> {
+    if (!this.initialized) await this.init();
+    const provider = this.registry.getProvider('ollama') as OllamaProvider | undefined;
+    if (!provider) throw new NoosphereError('Ollama provider not available', { code: 'PROVIDER_UNAVAILABLE', provider: 'ollama', modality: 'llm' });
+    await provider.deleteModel(name);
+  }
+
+  async getHardware(): Promise<{ ollama: boolean; runningModels: import('./providers/ollama.js').OllamaRunningModel[] }> {
+    if (!this.initialized) await this.init();
+    const provider = this.registry.getProvider('ollama') as OllamaProvider | undefined;
+    if (!provider) return { ollama: false, runningModels: [] };
+    try {
+      const runningModels = await provider.getRunningModels();
+      return { ollama: true, runningModels };
+    } catch {
+      return { ollama: false, runningModels: [] };
+    }
+  }
+
   // --- Lifecycle ---
 
   async dispose(): Promise<void> {
@@ -285,11 +314,22 @@ export class Noosphere {
         }
       };
 
+      const ollamaCfg = local['ollama'];
       const comfyuiCfg = local['comfyui'];
       const piperCfg = local['piper'];
       const kokoroCfg = local['kokoro'];
 
       await Promise.allSettled([
+        // Ollama — auto-detect even without explicit config
+        (async () => {
+          const host = ollamaCfg?.host ?? 'http://localhost';
+          const port = ollamaCfg?.port ?? 11434;
+          const provider = new OllamaProvider({ host, port });
+          const ok = await provider.ping();
+          if (ok) {
+            this.registry.addProvider(provider);
+          }
+        })(),
         // ComfyUI
         (async () => {
           if (comfyuiCfg?.enabled) {

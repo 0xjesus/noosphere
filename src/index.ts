@@ -21,6 +21,10 @@ export type {
   NoosphereErrorCode,
   LocalServiceConfig,
   ProviderLogo,
+  ModelStatus,
+  LocalModelInfo,
 } from './types.js';
 export type { NoosphereProvider } from './providers/base.js';
+export { OllamaProvider } from './providers/ollama.js';
+export type { OllamaPullProgress, OllamaModelDetail, OllamaRunningModel } from './providers/ollama.js';
 export { PROVIDER_LOGOS, getProviderLogo, getAllProviderLogos, PROVIDER_IDS } from './logos.js';
