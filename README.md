@@ -324,108 +324,219 @@ const imageModels = await ai.getModels('image');
 
 ---
 
-## Local Models — Run Everything on Your Machine (Coming Soon)
+## Local Models — Run Everything on Your Machine
 
-Noosphere is building **comprehensive local model support** across all modalities — not just cloud APIs, but everything you can run on your own hardware.
+Noosphere has **comprehensive local model support** across all modalities — LLM, image, video, TTS, STT, and music. Auto-discovers what's installed, catalogs what's available to download, and provides a unified API for everything.
 
-### The Vision
+### Quick Start
 
 ```typescript
 const ai = new Noosphere();
 await ai.syncModels();
 
-// Everything you can run locally — installed or available to download
-const local = await ai.getModels({ local: true });
-// → 200+ models: Ollama LLMs, Diffusers image models, ComfyUI workflows, TTS, STT, Music...
+// 774 models discovered — cloud + local, all modalities
+const all = await ai.getModels();
+
+// Filter by what you can run locally
+const localModels = all.filter(m => m.local || m.status === 'installed');
 
 // What's installed vs what's available to download
-const installed = await ai.getModels({ local: true, status: 'installed' });
-const available = await ai.getModels({ local: true, status: 'available' });
+const installed = all.filter(m => m.status === 'installed');   // 39 models ready to use
+const available = all.filter(m => m.status === 'available');   // 251 models you can download
 
-// Install a model from the web catalog
-await ai.installModel('ollama/deepseek-r1:14b');       // pulls from Ollama library
-await ai.installModel('hf/stabilityai/sd-turbo');       // downloads from HuggingFace
-await ai.installModel('comfyui/flux-schnell');           // downloads checkpoint for ComfyUI
-
-// Use it — same unified API as cloud models
-const result = await ai.chat({ model: 'deepseek-r1:14b', messages: [...] });
-const image = await ai.image({ model: 'flux-schnell', prompt: 'a cat in space' });
-const audio = await ai.speak({ model: 'kokoro/af_heart', text: 'Hello world' });
-const music = await ai.generate({ modality: 'music', model: 'musicgen-small', prompt: 'lo-fi beats' });
-const transcript = await ai.transcribe({ model: 'whisper-large-v3', audio: './recording.mp3' });
-```
-
-### Supported Local Runtimes
-
-| Runtime | LLM | Image | Video | TTS | STT | Music | Embeddings |
-|---|---|---|---|---|---|---|---|
-| **Ollama** | ✅ 215+ families | — | — | — | — | — | ✅ 10+ |
-| **Diffusers** (Python) | — | ✅ 1000+ | ✅ 50+ | ✅ Bark | — | ✅ AudioLDM | — |
-| **ComfyUI** | — | ✅ workflows | ✅ workflows | — | — | — | — |
-| **Piper** | — | — | — | ✅ 100+ voices | — | — | — |
-| **Kokoro** | — | — | — | ✅ multi-voice | — | — | — |
-| **Whisper** | — | — | — | — | ✅ 9 sizes | — | — |
-| **AudioCraft** | — | — | — | — | — | ✅ MusicGen | — |
-
-### Web Catalogs (Auto-Fetched)
-
-| Source | What it provides |
-|---|---|
-| **Ollama Library** (`ollama.com`) | 215+ LLM families with all tags, sizes, and quantizations |
-| **HuggingFace Models** (`huggingface.co/api`) | 100K+ models across all modalities, filtered by pipeline type |
-| **CivitAI** (`civitai.com/api`) | SD/SDXL/FLUX checkpoints, LoRAs, embeddings with previews |
-| **Piper Voices** (`huggingface.co/rhasspy`) | 100+ TTS voices in 30+ languages |
-
-### Hardware-Aware Recommendations
-
-Noosphere detects your GPU and recommends models that actually fit:
-
-```typescript
-const hw = await ai.getHardware();
-// → { gpu: 'NVIDIA RTX 2000 Ada', vramMB: 8188, compute: 'cuda' }
-
-const recommended = await ai.recommend('image');
-// → Models sorted by quality that fit in your 8GB VRAM:
-//   1. FLUX.1-schnell (FP8) — 6GB VRAM
-//   2. SD-Turbo — 4GB VRAM
-//   3. SDXL-Turbo — 6GB VRAM
-```
-
-### Model Lifecycle
-
-Every local model has a `status` and `localInfo`:
-
-```typescript
-{
-  id: 'llama3.3:70b',
+// Chat with a local Ollama model — same API as cloud
+const result = await ai.chat({
+  model: 'qwen3:8b',
   provider: 'ollama',
-  status: 'installed',           // installed | available | downloading | running
-  local: true,
-  logo: { svg: 'https://...meta.svg', png: 'https://...meta.png' },
-  localInfo: {
-    sizeBytes: 42520413916,
-    family: 'llama',
-    parameterSize: '70.6B',
-    quantization: 'Q4_K_M',
-    format: 'gguf',
-    running: false,
-    vramRequired: 42000000000,
-  },
+  messages: [{ role: 'user', content: 'Hello!' }],
+});
+console.log(result.content);   // "Hello! How can I help?"
+console.log(result.usage);     // { cost: 0, input: 24, output: 198, unit: 'tokens' }
+
+// Install a new model from Ollama library
+await ai.installModel('deepseek-r1:14b');
+
+// Uninstall
+await ai.uninstallModel('deepseek-r1:14b');
+```
+
+### 8 Providers, 5 Modalities, 774+ Models
+
+| Provider | Modality | Models | Source | Auto-Detect |
+|---|---|---|---|---|
+| **pi-ai** | LLM | 482 | OpenAI, Anthropic, Google, Groq, Mistral, xAI, OpenRouter, Cerebras | API keys |
+| **ollama** | LLM, embedding | 70 | 38 installed + 32 from Ollama web catalog | `localhost:11434` |
+| **hf-local** | image, video, tts, stt | 220 | HuggingFace catalog (FLUX, SDXL, Wan2.2, Whisper, MusicGen) | Always |
+| **comfyui** | image, video | dynamic | Installed checkpoints + CivitAI catalog | `localhost:8188` |
+| **openai-compat** | LLM | dynamic | llama.cpp, LM Studio, vLLM, LocalAI, KoboldCpp, Jan, TabbyAPI | Scans ports |
+| **piper** | TTS | 2+ | Piper voices installed locally | Binary detection |
+| **whisper-local** | STT | 8 | Whisper/Faster-Whisper (tiny → large-v3) | Python detection |
+| **audiocraft** | music | 5 | MusicGen (small/medium/large/melody) + AudioGen | Python detection |
+
+### Models by Modality
+
+```typescript
+const models = await ai.getModels();
+
+// Filter by modality
+const llm    = models.filter(m => m.modality === 'llm');    // 552 (cloud + Ollama local)
+const image  = models.filter(m => m.modality === 'image');  // 101 (FLUX, SDXL, SD3, PixArt...)
+const tts    = models.filter(m => m.modality === 'tts');    //  61 (MusicGen, Bark, Piper, Kokoro...)
+const video  = models.filter(m => m.modality === 'video');  //  30 (Wan2.2, CogVideoX, AnimateDiff...)
+const stt    = models.filter(m => m.modality === 'stt');    //  30 (Whisper, wav2vec2...)
+```
+
+### Ollama Provider — Local LLM
+
+Full integration with Ollama's API:
+
+```typescript
+// Auto-detected on startup — no config needed
+// Models include full metadata from Ollama
+
+const ollamaModels = models.filter(m => m.provider === 'ollama');
+for (const m of ollamaModels) {
+  console.log(m.id);                      // "llama3.3:70b"
+  console.log(m.status);                  // "installed" | "available" | "running"
+  console.log(m.localInfo.parameterSize); // "70.6B"
+  console.log(m.localInfo.quantization);  // "Q4_K_M"
+  console.log(m.localInfo.sizeBytes);     // 42520413916
+  console.log(m.localInfo.family);        // "llama"
+  console.log(m.logo);                    // { svg: "...meta.svg", png: "...meta.png" }
+}
+
+// Chat with streaming
+const stream = ai.stream({
+  model: 'qwen3:8b',
+  provider: 'ollama',
+  messages: [{ role: 'user', content: 'Explain quantum computing' }],
+});
+
+for await (const event of stream) {
+  if (event.type === 'text_delta') process.stdout.write(event.delta);
+}
+
+const finalResult = await stream.result();
+
+// Model management
+await ai.installModel('deepseek-r1:14b');     // Downloads from Ollama library
+await ai.uninstallModel('old-model:7b');       // Removes from disk
+
+// Hardware info
+const hw = await ai.getHardware();
+// { ollama: true, runningModels: [{ name: 'qwen3:8b', size: 5200000000, ... }] }
+```
+
+### OpenAI-Compatible Provider — Any Local Server
+
+Connects to ANY server that implements the OpenAI API:
+
+```typescript
+// Auto-detects servers on common ports:
+// llama.cpp (:8080), LM Studio (:1234), vLLM (:8000)
+// LocalAI (:8080), TabbyAPI (:5000), KoboldCpp (:5001), Jan (:1337)
+
+// Or configure manually:
+const ai = new Noosphere({
+  openaiCompat: [
+    { baseUrl: 'http://localhost:1234/v1', name: 'LM Studio' },
+    { baseUrl: 'http://192.168.1.100:8080/v1', name: 'Remote llama.cpp' },
+  ],
+});
+```
+
+### HuggingFace Local Catalog
+
+Auto-fetches the top models by downloads for each modality:
+
+```typescript
+const imageModels = models.filter(m => m.provider === 'hf-local' && m.modality === 'image');
+// → FLUX.1-dev, FLUX.1-schnell, SDXL, SD 3.5, PixArt-Σ, Playground v2.5, Kolors...
+
+const videoModels = models.filter(m => m.provider === 'hf-local' && m.modality === 'video');
+// → Wan2.2-T2V, CogVideoX-5b, AnimateDiff, Stable Video Diffusion...
+
+const ttsModels = models.filter(m => m.provider === 'hf-local' && m.modality === 'tts');
+// → MusicGen, Stable Audio Open, Bark, ACE-Step...
+
+const sttModels = models.filter(m => m.provider === 'hf-local' && m.modality === 'stt');
+// → Whisper large-v3, Whisper large-v3-turbo, wav2vec2...
+```
+
+Models already downloaded to `~/.cache/huggingface/hub/` are automatically detected as `status: 'installed'`.
+
+### ComfyUI — Dynamic Workflow Engine
+
+When ComfyUI is running, noosphere discovers all installed checkpoints, LoRAs, and models:
+
+```typescript
+// Auto-detected on localhost:8188
+const comfyModels = models.filter(m => m.provider === 'comfyui');
+// → All checkpoints (SD 1.5, SDXL, FLUX, Pony, etc.)
+
+// Also fetches top models from CivitAI as "available"
+const civitai = comfyModels.filter(m => m.status === 'available');
+```
+
+### Model Status & Local Info
+
+Every local model includes rich metadata:
+
+```typescript
+interface ModelInfo {
+  id: string;
+  provider: string;
+  modality: 'llm' | 'image' | 'video' | 'tts' | 'stt' | 'music' | 'embedding';
+  status?: 'installed' | 'available' | 'downloading' | 'running' | 'error';
+  local: boolean;
+  logo?: { svg?: string; png?: string };
+  localInfo?: {
+    sizeBytes: number;
+    family?: string;              // "llama", "gemma3", "qwen2"
+    parameterSize?: string;       // "70.6B", "7B", "3.2B"
+    quantization?: string;        // "Q4_K_M", "Q8_0", "F16"
+    format?: string;              // "gguf", "safetensors", "onnx"
+    digest?: string;
+    modifiedAt?: string;
+    running?: boolean;
+    runtime: string;              // "ollama", "diffusers", "comfyui", "piper", "whisper"
+  };
+  capabilities: {
+    contextWindow?: number;
+    maxTokens?: number;
+    supportsVision?: boolean;
+    supportsStreaming?: boolean;
+  };
 }
 ```
 
-### Implementation Roadmap
+### Web Catalogs (Auto-Fetched)
 
-| Phase | Scope | Status |
+| Source | API | What it provides |
 |---|---|---|
-| **Phase 1** | Ollama Provider (local + web catalog, chat, install/uninstall) | 🔜 Next |
-| **Phase 2** | Diffusers Provider (image + video generation via Python bridge) | Planned |
-| **Phase 3** | ComfyUI Enhancement (dynamic model discovery, CivitAI catalog) | Planned |
-| **Phase 4** | Audio Suite (enhanced TTS, Whisper STT, MusicGen) | Planned |
-| **Phase 5** | Embeddings (Ollama embedding models) | Planned |
-| **Phase 6** | Model Manager (hardware detection, unified install, recommendations) | Planned |
+| **Ollama Library** | `ollama.com/api/tags` | 215+ LLM families with sizes and quantizations |
+| **HuggingFace** | `huggingface.co/api/models?pipeline_tag=...` | Top models per modality (image, video, TTS, STT) |
+| **CivitAI** | `civitai.com/api/v1/models` | SD/SDXL/FLUX checkpoints with previews |
 
-> 📄 **Full implementation plan:** [`docs/LOCAL_MODELS_PLAN.md`](./docs/LOCAL_MODELS_PLAN.md)
+### Auto-Detection — Zero Config
+
+Noosphere auto-detects all local runtimes on startup:
+
+| Runtime | Detection Method | Default Port |
+|---|---|---|
+| Ollama | `GET localhost:11434/api/version` | 11434 |
+| ComfyUI | `GET localhost:8188/system_stats` | 8188 |
+| llama.cpp | `GET localhost:8080/health` | 8080 |
+| LM Studio | `GET localhost:1234/v1/models` | 1234 |
+| vLLM | `GET localhost:8000/v1/models` | 8000 |
+| KoboldCpp | `GET localhost:5001/v1/models` | 5001 |
+| TabbyAPI | `GET localhost:5000/v1/models` | 5000 |
+| Jan | `GET localhost:1337/v1/models` | 1337 |
+| Piper | Binary in PATH | — |
+| Whisper | Python package detection | — |
+| AudioCraft | Python package detection | — |
+
+> 📄 **Full research:** [`docs/LOCAL_AI_RESEARCH.md`](./docs/LOCAL_AI_RESEARCH.md) — 44KB covering 12+ runtimes across all modalities
 
 ---
 
