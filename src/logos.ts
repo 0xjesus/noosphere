@@ -39,8 +39,8 @@ const HAS_SVG = new Set<string>([
   'meta', 'deepseek', 'microsoft', 'nvidia', 'qwen',
   'cohere', 'perplexity', 'amazon', 'baidu',
   'together', 'fireworks-ai', 'replicate', 'nebius', 'novita',
-  // Sub-agent found additional SVGs
   'comfyui', 'fal', 'kokoro', 'piper', 'sambanova', 'pi-ai', 'zai',
+  // NO SVG: bytedance, tencent, xiaomi, ibm, ai21, inflection, upstage, minimax
 ]);
 
 // Cache
