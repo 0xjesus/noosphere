@@ -463,6 +463,17 @@ export class PiAiProvider implements NoosphereProvider {
       'cohere/': 'cohere',
       'perplexity/': 'perplexity',
       'amazon/': 'amazon',
+      'z-ai/': 'zai',
+      'minimax/': 'minimax',
+      'baidu/': 'baidu',
+      'bytedance/': 'bytedance', 'bytedance-seed/': 'bytedance',
+      'tencent/': 'tencent',
+      'xiaomi/': 'xiaomi',
+      'ibm-granite/': 'ibm', 'ibm/': 'ibm',
+      'ai21/': 'ai21',
+      'inflection/': 'inflection',
+      'upstage/': 'upstage',
+      'alibaba/': 'qwen',
     };
 
     const lower = modelId.toLowerCase();

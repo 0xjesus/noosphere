@@ -32,7 +32,7 @@ function assetsDir(): string {
 export const PROVIDER_IDS = [
   // Cloud LLM
   'openai', 'anthropic', 'google', 'groq', 'mistral', 'xai',
-  'openrouter', 'cerebras',
+  'openrouter', 'cerebras', 'pi-ai',
   // Media
   'fal', 'huggingface',
   // Local
@@ -40,6 +40,9 @@ export const PROVIDER_IDS = [
   // Model orgs (from OpenRouter prefixes)
   'meta', 'deepseek', 'microsoft', 'nvidia', 'qwen',
   'cohere', 'perplexity', 'amazon',
+  // Additional model orgs
+  'zai', 'minimax', 'baidu', 'bytedance', 'tencent',
+  'xiaomi', 'ibm', 'ai21', 'inflection', 'upstage',
   // HuggingFace inference providers
   'sambanova', 'together', 'fireworks-ai', 'replicate', 'nebius', 'novita',
 ] as const;
