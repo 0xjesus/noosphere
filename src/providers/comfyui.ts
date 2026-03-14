@@ -126,6 +126,9 @@ export class ComfyUIProvider implements NoosphereProvider {
               models.push({
                 id: `civitai-${item.id}`, provider: 'comfyui',
                 name: item.name ?? `CivitAI Model ${item.id}`,
+                description: item.description
+                  ? item.description.replace(/<[^>]+>/g, '').trim().slice(0, 300) || undefined
+                  : undefined,
                 modality: 'image', local: true, cost: { price: 0, unit: 'free' }, logo,
                 status: 'available',
                 localInfo: {
