@@ -32,7 +32,7 @@ const HF_ORG_TO_LOGO_PROVIDER: Record<string, string> = {
 const PIPELINE_TAG_TO_MODALITY: Record<string, Modality> = {
   'text-to-image': 'image',
   'text-to-video': 'video',
-  'text-to-audio': 'tts',
+  'text-to-audio': 'music',
   'text-to-speech': 'tts',
   'automatic-speech-recognition': 'stt',
 };
@@ -63,7 +63,7 @@ async function fetchJsonTimeout(url: string, timeoutMs = FETCH_TIMEOUT_MS): Prom
 export class HfLocalProvider implements NoosphereProvider {
   readonly id = 'hf-local';
   readonly name = 'HuggingFace Local Models';
-  readonly modalities: Modality[] = ['image', 'video', 'tts', 'stt'];
+  readonly modalities: Modality[] = ['image', 'video', 'tts', 'stt', 'music'];
   readonly isLocal = true;
 
   private cachedModels: ModelInfo[] | null = null;

@@ -369,9 +369,11 @@ await ai.uninstallModel('deepseek-r1:14b');
 |---|---|---|---|---|
 | **pi-ai** | LLM | 482 | OpenAI, Anthropic, Google, Groq, Mistral, xAI, OpenRouter, Cerebras | API keys |
 | **ollama** | LLM, embedding | 70 | 38 installed + 32 from Ollama web catalog | `localhost:11434` |
-| **hf-local** | image, video, tts, stt | 220 | HuggingFace catalog (FLUX, SDXL, Wan2.2, Whisper, MusicGen) | Always |
+| **hf-local** | image, video, tts, stt, music | 220 | HuggingFace catalog (FLUX, SDXL, Wan2.2, Whisper, MusicGen) | Always (no API key) |
+| **huggingface** | LLM, image, tts | dynamic | HuggingFace Inference API | `HUGGINGFACE_TOKEN` |
 | **comfyui** | image, video | dynamic | Installed checkpoints + CivitAI catalog | `localhost:8188` |
 | **openai-compat** | LLM | dynamic | llama.cpp, LM Studio, vLLM, LocalAI, KoboldCpp, Jan, TabbyAPI | Scans ports |
+| **fal** | image, video, tts | 867+ | FAL.ai (Flux, SDXL, Kling, Sora 2, Kokoro, ElevenLabs) | `FAL_KEY` |
 | **piper** | TTS | 2+ | Piper voices installed locally | Binary detection |
 | **whisper-local** | STT | 8 | Whisper/Faster-Whisper (tiny → large-v3) | Python detection |
 | **audiocraft** | music | 5 | MusicGen (small/medium/large/melody) + AudioGen | Python detection |
@@ -398,12 +400,12 @@ await ai.syncModels();
 
 | Modality | Providers Synced |
 |---|---|
-| `llm` | pi-ai, ollama, openai-compat, huggingface |
-| `image` | hf-local, comfyui, fal, huggingface |
+| `llm` | pi-ai, ollama, openai-compat, huggingface (cloud, needs API key) |
+| `image` | hf-local, comfyui, fal, huggingface (cloud) |
 | `video` | hf-local, comfyui, fal |
-| `tts` | hf-local, fal, piper, kokoro |
+| `tts` | hf-local (speech models), fal, piper, kokoro, huggingface (cloud) |
 | `stt` | hf-local, whisper-local |
-| `music` | audiocraft |
+| `music` | hf-local (MusicGen, AudioLDM, etc.), audiocraft |
 | `embedding` | ollama |
 
 ### Models by Modality
