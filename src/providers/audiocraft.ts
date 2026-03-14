@@ -15,6 +15,52 @@ const AUDIOCRAFT_MODELS = [
   { id: 'audiogen-medium', name: 'AudioGen Medium' },
 ];
 
+const AUDIOCRAFT_HF_REPOS: Record<string, string> = {
+  'musicgen-small': 'facebook/musicgen-small',
+  'musicgen-medium': 'facebook/musicgen-medium',
+  'musicgen-large': 'facebook/musicgen-large',
+  'musicgen-melody': 'facebook/musicgen-melody',
+  'audiogen-medium': 'facebook/audiogen-medium',
+};
+
+async function fetchAudioCraftDescriptions(timeoutMs = 8000): Promise<Map<string, string>> {
+  const descriptions = new Map<string, string>();
+  const fetches = Object.entries(AUDIOCRAFT_HF_REPOS).map(async ([id, repo]) => {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const res = await fetch(`https://huggingface.co/${repo}/raw/main/README.md`, { signal: controller.signal });
+        if (!res.ok) return;
+        const text = await res.text();
+        const withoutFrontmatter = text.replace(/^---[\s\S]*?---\s*/, '');
+        const lines = withoutFrontmatter.split('\n');
+        let paragraph = '';
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) { if (paragraph) break; continue; }
+          if (trimmed.startsWith('#')) { if (paragraph) break; continue; }
+          if (/^\[?!\[/.test(trimmed) || /^</.test(trimmed)) continue;
+          if (/^\[.*\]\(.*\)$/.test(trimmed)) continue;
+          paragraph += (paragraph ? ' ' : '') + trimmed;
+        }
+        if (paragraph) {
+          paragraph = paragraph
+            .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+            .replace(/\*\*([^*]+)\*\*/g, '$1')
+            .replace(/`([^`]+)`/g, '$1')
+            .replace(/<[^>]+>/g, '')
+            .trim();
+          if (paragraph.length > 300) paragraph = paragraph.slice(0, 297) + '...';
+          descriptions.set(id, paragraph);
+        }
+      } finally { clearTimeout(timer); }
+    } catch { /* ignore fetch failures */ }
+  });
+  await Promise.allSettled(fetches);
+  return descriptions;
+}
+
 function runPython(code: string, timeoutMs = 5000): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile('python3', ['-c', code], { timeout: timeoutMs }, (err, stdout) => {
@@ -51,6 +97,7 @@ export class AudioCraftProvider implements NoosphereProvider {
     if (_modality && _modality !== 'music') return [];
     if (!(await this.ping())) return [];
 
+    const descMap = await fetchAudioCraftDescriptions().catch(() => new Map<string, string>());
     const logo = getProviderLogo('meta');
     const models: ModelInfo[] = [];
 
@@ -62,6 +109,7 @@ export class AudioCraftProvider implements NoosphereProvider {
         id: m.id,
         provider: 'audiocraft',
         name: m.name,
+        description: descMap.get(m.id),
         modality: 'music',
         local: true,
         cost: { price: 0, unit: 'free' },

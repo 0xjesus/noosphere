@@ -10,6 +10,55 @@ import { homedir } from 'node:os';
 
 const WHISPER_MODELS = ['tiny', 'base', 'small', 'medium', 'large', 'large-v2', 'large-v3', 'turbo'];
 
+const WHISPER_HF_REPOS: Record<string, string> = {
+  'tiny': 'openai/whisper-tiny',
+  'base': 'openai/whisper-base',
+  'small': 'openai/whisper-small',
+  'medium': 'openai/whisper-medium',
+  'large': 'openai/whisper-large',
+  'large-v2': 'openai/whisper-large-v2',
+  'large-v3': 'openai/whisper-large-v3',
+  'turbo': 'openai/whisper-large-v3-turbo',
+};
+
+async function fetchWhisperDescriptions(timeoutMs = 8000): Promise<Map<string, string>> {
+  const descriptions = new Map<string, string>();
+  const fetches = Object.entries(WHISPER_HF_REPOS).map(async ([size, repo]) => {
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const res = await fetch(`https://huggingface.co/${repo}/raw/main/README.md`, { signal: controller.signal });
+        if (!res.ok) return;
+        const text = await res.text();
+        const withoutFrontmatter = text.replace(/^---[\s\S]*?---\s*/, '');
+        const lines = withoutFrontmatter.split('\n');
+        let paragraph = '';
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) { if (paragraph) break; continue; }
+          if (trimmed.startsWith('#')) { if (paragraph) break; continue; }
+          if (/^\[?!\[/.test(trimmed) || /^</.test(trimmed)) continue;
+          if (/^\[.*\]\(.*\)$/.test(trimmed)) continue;
+          paragraph += (paragraph ? ' ' : '') + trimmed;
+        }
+        if (paragraph) {
+          paragraph = paragraph
+            .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+            .replace(/\*\*([^*]+)\*\*/g, '$1')
+            .replace(/`([^`]+)`/g, '$1')
+            .replace(/<[^>]+>/g, '')
+            .trim();
+          if (paragraph.length > 300) paragraph = paragraph.slice(0, 297) + '...';
+          descriptions.set(size, paragraph);
+        }
+      } finally { clearTimeout(timer); }
+    } catch { /* ignore fetch failures */ }
+  });
+  await Promise.allSettled(fetches);
+  return descriptions;
+}
+
 function runPython(code: string, timeoutMs = 5000): Promise<string> {
   return new Promise((resolve, reject) => {
     const proc = execFile('python3', ['-c', code], { timeout: timeoutMs }, (err, stdout) => {
@@ -56,7 +105,9 @@ export class WhisperLocalProvider implements NoosphereProvider {
     const runtime = await this.detectRuntime();
     if (!runtime) return [];
 
-    const logo = getProviderLogo('huggingface');
+    const descMap = await fetchWhisperDescriptions().catch(() => new Map<string, string>());
+    const logo = getProviderLogo('openai'); // Whisper is by OpenAI
+
     const models: ModelInfo[] = [];
 
     for (const name of WHISPER_MODELS) {
@@ -65,6 +116,7 @@ export class WhisperLocalProvider implements NoosphereProvider {
         id: `whisper-${name}`,
         provider: 'whisper-local',
         name: `Whisper ${name}`,
+        description: descMap.get(name),
         modality: 'stt',
         local: true,
         cost: { price: 0, unit: 'free' },
