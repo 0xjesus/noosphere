@@ -3,6 +3,7 @@ import type { NoosphereProvider } from './base.js';
 import type { Modality, ModelInfo } from '../types.js';
 import type { TranscriptionOptions, TranscriptionResult } from '../types.js';
 import { getProviderLogo } from '../logos.js';
+import { fetchReadmeDescription } from '../utils/parse-readme.js';
 import { execFile } from 'node:child_process';
 import { access } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -21,39 +22,11 @@ const WHISPER_HF_REPOS: Record<string, string> = {
   'turbo': 'openai/whisper-large-v3-turbo',
 };
 
-async function fetchWhisperDescriptions(timeoutMs = 8000): Promise<Map<string, string>> {
+async function fetchWhisperDescriptions(): Promise<Map<string, string>> {
   const descriptions = new Map<string, string>();
   const fetches = Object.entries(WHISPER_HF_REPOS).map(async ([size, repo]) => {
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeoutMs);
-      try {
-        const res = await fetch(`https://huggingface.co/${repo}/raw/main/README.md`, { signal: controller.signal });
-        if (!res.ok) return;
-        const text = await res.text();
-        const withoutFrontmatter = text.replace(/^---[\s\S]*?---\s*/, '');
-        const lines = withoutFrontmatter.split('\n');
-        let paragraph = '';
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed) { if (paragraph) break; continue; }
-          if (trimmed.startsWith('#')) { if (paragraph) break; continue; }
-          if (/^\[?!\[/.test(trimmed) || /^</.test(trimmed)) continue;
-          if (/^\[.*\]\(.*\)$/.test(trimmed)) continue;
-          paragraph += (paragraph ? ' ' : '') + trimmed;
-        }
-        if (paragraph) {
-          paragraph = paragraph
-            .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-            .replace(/\*\*([^*]+)\*\*/g, '$1')
-            .replace(/`([^`]+)`/g, '$1')
-            .replace(/<[^>]+>/g, '')
-            .trim();
-          if (paragraph.length > 300) paragraph = paragraph.slice(0, 297) + '...';
-          descriptions.set(size, paragraph);
-        }
-      } finally { clearTimeout(timer); }
-    } catch { /* ignore fetch failures */ }
+    const desc = await fetchReadmeDescription(repo, 8000);
+    if (desc) descriptions.set(size, desc);
   });
   await Promise.allSettled(fetches);
   return descriptions;

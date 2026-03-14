@@ -2,6 +2,7 @@
 import type { NoosphereProvider } from './base.js';
 import type { Modality, ModelInfo } from '../types.js';
 import { getProviderLogo } from '../logos.js';
+import { fetchReadmeDescription } from '../utils/parse-readme.js';
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
@@ -57,41 +58,6 @@ async function fetchJsonTimeout(url: string, timeoutMs = FETCH_TIMEOUT_MS): Prom
   } finally {
     clearTimeout(timer);
   }
-}
-
-async function fetchReadmeDescription(modelId: string, timeoutMs = 5000): Promise<string | undefined> {
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const res = await fetch(`https://huggingface.co/${modelId}/raw/main/README.md`, { signal: controller.signal });
-      if (!res.ok) return undefined;
-      const text = await res.text();
-      // Strip YAML frontmatter
-      const withoutFrontmatter = text.replace(/^---[\s\S]*?---\s*/, '');
-      const lines = withoutFrontmatter.split('\n');
-      let paragraph = '';
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed) { if (paragraph) break; continue; }
-        if (trimmed.startsWith('#')) { if (paragraph) break; continue; }
-        if (/^\[?!\[/.test(trimmed) || /^</.test(trimmed)) continue;
-        if (/^\[.*\]\(.*\)$/.test(trimmed)) continue;
-        paragraph += (paragraph ? ' ' : '') + trimmed;
-      }
-      if (paragraph) {
-        paragraph = paragraph
-          .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-          .replace(/\*\*([^*]+)\*\*/g, '$1')
-          .replace(/`([^`]+)`/g, '$1')
-          .replace(/<[^>]+>/g, '')
-          .trim();
-        if (paragraph.length > 300) paragraph = paragraph.slice(0, 297) + '...';
-        return paragraph;
-      }
-    } finally { clearTimeout(timer); }
-  } catch { /* timeout or network error */ }
-  return undefined;
 }
 
 export class HfLocalProvider implements NoosphereProvider {
