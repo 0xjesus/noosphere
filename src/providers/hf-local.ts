@@ -9,6 +9,25 @@ import { homedir } from 'node:os';
 const FETCH_TIMEOUT_MS = 5000;
 const HF_HUB_API = 'https://huggingface.co/api/models';
 
+const HF_ORG_TO_LOGO_PROVIDER: Record<string, string> = {
+  'meta-llama': 'meta',
+  'facebook': 'meta',
+  'google': 'google',
+  'microsoft': 'microsoft',
+  'nvidia': 'nvidia',
+  'mistralai': 'mistral',
+  'Qwen': 'qwen',
+  'deepseek-ai': 'deepseek',
+  'openai': 'openai',
+  'CohereForAI': 'cohere',
+  'rhasspy': 'piper',
+  'stabilityai': 'huggingface',
+  'black-forest-labs': 'huggingface',
+  'tiiuae': 'huggingface',
+  'allenai': 'huggingface',
+  'Salesforce': 'huggingface',
+};
+
 const PIPELINE_TAG_TO_MODALITY: Record<string, Modality> = {
   'text-to-image': 'image',
   'text-to-video': 'video',
@@ -38,6 +57,41 @@ async function fetchJsonTimeout(url: string, timeoutMs = FETCH_TIMEOUT_MS): Prom
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function fetchReadmeDescription(modelId: string, timeoutMs = 5000): Promise<string | undefined> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(`https://huggingface.co/${modelId}/raw/main/README.md`, { signal: controller.signal });
+      if (!res.ok) return undefined;
+      const text = await res.text();
+      // Strip YAML frontmatter
+      const withoutFrontmatter = text.replace(/^---[\s\S]*?---\s*/, '');
+      const lines = withoutFrontmatter.split('\n');
+      let paragraph = '';
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) { if (paragraph) break; continue; }
+        if (trimmed.startsWith('#')) { if (paragraph) break; continue; }
+        if (/^\[?!\[/.test(trimmed) || /^</.test(trimmed)) continue;
+        if (/^\[.*\]\(.*\)$/.test(trimmed)) continue;
+        paragraph += (paragraph ? ' ' : '') + trimmed;
+      }
+      if (paragraph) {
+        paragraph = paragraph
+          .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+          .replace(/\*\*([^*]+)\*\*/g, '$1')
+          .replace(/`([^`]+)`/g, '$1')
+          .replace(/<[^>]+>/g, '')
+          .trim();
+        if (paragraph.length > 300) paragraph = paragraph.slice(0, 297) + '...';
+        return paragraph;
+      }
+    } finally { clearTimeout(timer); }
+  } catch { /* timeout or network error */ }
+  return undefined;
 }
 
 export class HfLocalProvider implements NoosphereProvider {
@@ -72,8 +126,7 @@ export class HfLocalProvider implements NoosphereProvider {
 
   private async fetchCatalog(): Promise<ModelInfo[]> {
     const seen = new Set<string>();
-    const models: ModelInfo[] = [];
-    const logo = getProviderLogo('huggingface');
+    const entries: Array<{ id: string; pipelineTag: string; libraryName?: string }> = [];
 
     const results = await Promise.allSettled(
       CATALOG_QUERIES.map(async (q) => {
@@ -93,27 +146,55 @@ export class HfLocalProvider implements NoosphereProvider {
         const id = entry.id ?? entry.modelId;
         if (!id || seen.has(id)) continue;
         seen.add(id);
-
-        const pipelineTag = entry.pipeline_tag ?? '';
-        const modality = PIPELINE_TAG_TO_MODALITY[pipelineTag] ?? 'image';
-
-        models.push({
+        entries.push({
           id,
-          provider: 'hf-local',
-          name: id.split('/').pop() ?? id,
-          modality,
-          local: true,
-          cost: { price: 0, unit: 'free' },
-          logo,
-          status: 'available',
-          localInfo: {
-            sizeBytes: 0,
-            runtime: 'huggingface',
-            family: entry.library_name,
-          },
-          capabilities: {},
+          pipelineTag: entry.pipeline_tag ?? '',
+          libraryName: entry.library_name,
         });
       }
+    }
+
+    // Batch-fetch descriptions (10 concurrent at a time)
+    const descriptionMap = new Map<string, string>();
+    for (let i = 0; i < entries.length; i += 10) {
+      const batch = entries.slice(i, i + 10);
+      const descs = await Promise.allSettled(
+        batch.map(async (e) => {
+          const desc = await fetchReadmeDescription(e.id);
+          return { id: e.id, desc };
+        }),
+      );
+      for (const d of descs) {
+        if (d.status === 'fulfilled' && d.value.desc) {
+          descriptionMap.set(d.value.id, d.value.desc);
+        }
+      }
+    }
+
+    // Build ModelInfo with descriptions and per-org logos
+    const models: ModelInfo[] = [];
+    for (const e of entries) {
+      const modality = PIPELINE_TAG_TO_MODALITY[e.pipelineTag] ?? 'image';
+      const org = e.id.includes('/') ? e.id.split('/')[0] : undefined;
+      const logoProvider = org ? (HF_ORG_TO_LOGO_PROVIDER[org] ?? 'huggingface') : 'huggingface';
+
+      models.push({
+        id: e.id,
+        provider: 'hf-local',
+        name: e.id.split('/').pop() ?? e.id,
+        modality,
+        local: true,
+        cost: { price: 0, unit: 'free' },
+        logo: getProviderLogo(logoProvider),
+        description: descriptionMap.get(e.id),
+        status: 'available',
+        localInfo: {
+          sizeBytes: 0,
+          runtime: 'huggingface',
+          family: e.libraryName,
+        },
+        capabilities: {},
+      });
     }
 
     return models;
@@ -122,7 +203,6 @@ export class HfLocalProvider implements NoosphereProvider {
   private async scanLocalCache(): Promise<ModelInfo[]> {
     const models: ModelInfo[] = [];
     const cacheDir = join(homedir(), '.cache', 'huggingface', 'hub');
-    const logo = getProviderLogo('huggingface');
 
     try {
       const entries = await readdir(cacheDir, { withFileTypes: true });
@@ -159,6 +239,8 @@ export class HfLocalProvider implements NoosphereProvider {
         }
 
         const modality = PIPELINE_TAG_TO_MODALITY[pipelineTag] ?? 'image';
+        const org = modelId.includes('/') ? modelId.split('/')[0] : undefined;
+        const logoProvider = org ? (HF_ORG_TO_LOGO_PROVIDER[org] ?? 'huggingface') : 'huggingface';
 
         models.push({
           id: modelId,
@@ -167,7 +249,7 @@ export class HfLocalProvider implements NoosphereProvider {
           modality,
           local: true,
           cost: { price: 0, unit: 'free' },
-          logo,
+          logo: getProviderLogo(logoProvider),
           status: 'installed',
           localInfo: {
             sizeBytes: 0,
