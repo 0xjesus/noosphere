@@ -6,11 +6,14 @@ One import. Every model. Every modality.
 
 ## Features
 
-- **4 modalities** — LLM chat, image generation, video generation, and text-to-speech
+- **7 modalities** — LLM, image, video, TTS, STT, music, and embeddings
 - **Always up-to-date models** — Dynamic auto-fetch from ALL provider APIs at runtime (OpenAI, Anthropic, Google, Groq, Mistral, xAI, Cerebras, OpenRouter)
+- **Dynamic descriptions** — Model descriptions fetched from source (Ollama library, HuggingFace READMEs, CivitAI API) — no hardcoded strings
+- **Modality-filtered sync** — `syncModels('llm')` only fetches LLM providers, avoiding unnecessary requests
 - **867+ media endpoints** — via FAL (Flux, SDXL, Kling, Sora 2, VEO 3, Kokoro, ElevenLabs, and hundreds more)
 - **30+ HuggingFace tasks** — LLM, image, TTS, translation, summarization, classification, and more
-- **Local-first architecture** — Auto-detects ComfyUI, Ollama, Piper, and Kokoro on your machine
+- **Local-first architecture** — Auto-detects Ollama, ComfyUI, Whisper, AudioCraft, Piper, and Kokoro on your machine
+- **Org-aware logos** — HuggingFace models show the real org logo (Meta, Google, NVIDIA) instead of generic HF logo
 - **Agentic capabilities** — Tool use, function calling, reasoning/thinking, vision, and agent loops via Pi-AI
 - **Failover & retry** — Automatic retries with exponential backoff and cross-provider failover
 - **Usage tracking** — Real-time cost, latency, and token tracking across all providers
@@ -373,6 +376,36 @@ await ai.uninstallModel('deepseek-r1:14b');
 | **whisper-local** | STT | 8 | Whisper/Faster-Whisper (tiny → large-v3) | Python detection |
 | **audiocraft** | music | 5 | MusicGen (small/medium/large/melody) + AudioGen | Python detection |
 
+### Modality-Filtered Sync — Only Fetch What You Need
+
+Sync **only the providers relevant to a specific modality** instead of fetching everything. This avoids unnecessary network requests (e.g., fetching 270+ HuggingFace READMEs when you only need LLMs).
+
+```typescript
+// Sync only LLM providers (Ollama, pi-ai, openai-compat, huggingface)
+await ai.syncModels('llm');
+
+// Sync only image providers (hf-local, comfyui, fal, huggingface)
+await ai.syncModels('image');
+
+// Sync only STT providers (whisper-local, hf-local)
+await ai.syncModels('stt');
+
+// Sync everything (backward compatible)
+await ai.syncModels();
+```
+
+**Which providers sync for each modality:**
+
+| Modality | Providers Synced |
+|---|---|
+| `llm` | pi-ai, ollama, openai-compat, huggingface |
+| `image` | hf-local, comfyui, fal, huggingface |
+| `video` | hf-local, comfyui, fal |
+| `tts` | hf-local, fal, piper, kokoro |
+| `stt` | hf-local, whisper-local |
+| `music` | audiocraft |
+| `embedding` | ollama |
+
 ### Models by Modality
 
 ```typescript
@@ -478,6 +511,38 @@ const comfyModels = models.filter(m => m.provider === 'comfyui');
 const civitai = comfyModels.filter(m => m.status === 'available');
 ```
 
+### Model Descriptions — Dynamic from Source
+
+Every model includes a `description` field fetched dynamically from its source — no hardcoded strings:
+
+```typescript
+const models = await ai.getModels('llm');
+
+for (const m of models) {
+  console.log(m.name, m.description);
+  // "llama3.1"  "Llama 3.1 is a new state-of-the-art model from Meta available in 8B, 70B and 405B"
+  // "qwen3"     "Qwen3 is the latest generation of large language models in Qwen series"
+  // "gemma3"    "The current, most capable model that runs on a single GPU"
+}
+
+const imageModels = await ai.getModels('image');
+for (const m of imageModels) {
+  console.log(m.name, m.description);
+  // "stable-diffusion-xl-base-1.0"  "Stable Diffusion XL (SDXL) is a latent text-to-image..."
+  // "FLUX.1-dev"                     "FLUX.1 [dev] is a 12 billion parameter rectified flow..."
+}
+```
+
+| Provider | Description Source |
+|---|---|
+| **Ollama** | Scraped from `ollama.com/library` page |
+| **HuggingFace Local** | Parsed from each model's `README.md` on HuggingFace Hub |
+| **CivitAI/ComfyUI** | Extracted from CivitAI API response |
+| **Whisper** | Parsed from OpenAI's Whisper README on HuggingFace |
+| **AudioCraft** | Parsed from Meta's AudioCraft README on HuggingFace |
+
+All description fetches are **parallel and fail-safe** — if a source is unreachable, models are returned without descriptions. No API keys required.
+
 ### Model Status & Local Info
 
 Every local model includes rich metadata:
@@ -486,6 +551,8 @@ Every local model includes rich metadata:
 interface ModelInfo {
   id: string;
   provider: string;
+  name: string;
+  description?: string;          // Dynamic from source (Ollama library, HF README, CivitAI)
   modality: 'llm' | 'image' | 'video' | 'tts' | 'stt' | 'music' | 'embedding';
   status?: 'installed' | 'available' | 'downloading' | 'running' | 'error';
   local: boolean;
