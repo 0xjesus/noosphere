@@ -217,9 +217,9 @@ export class Noosphere {
     return this.registry.getModel(provider, modelId);
   }
 
-  async syncModels(): Promise<SyncResult> {
+  async syncModels(modality?: Modality): Promise<SyncResult> {
     if (!this.initialized) await this.init();
-    return this.registry.syncAll();
+    return this.registry.syncAll(modality);
   }
 
   // --- Tracking Methods ---

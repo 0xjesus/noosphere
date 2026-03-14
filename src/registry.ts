@@ -79,23 +79,29 @@ export class Registry {
     return cached?.models.find((m) => m.id === modelId) ?? null;
   }
 
-  async syncProvider(providerId: string): Promise<number> {
+  async syncProvider(providerId: string, modality?: Modality): Promise<number> {
     const provider = this.providers.get(providerId);
     if (!provider) return 0;
 
-    const models = await provider.listModels();
+    // Skip providers that don't support the requested modality
+    if (modality && !provider.modalities.includes(modality)) return 0;
+
+    const models = await provider.listModels(modality);
     this.modelCache.set(providerId, { models, syncedAt: Date.now() });
     return models.length;
   }
 
-  async syncAll(): Promise<SyncResult> {
+  async syncAll(modality?: Modality): Promise<SyncResult> {
     const byProvider: Record<string, number> = {};
     const errors: string[] = [];
     let synced = 0;
 
     for (const provider of this.providers.values()) {
+      // Only sync providers that support the requested modality
+      if (modality && !provider.modalities.includes(modality)) continue;
+
       try {
-        const count = await this.syncProvider(provider.id);
+        const count = await this.syncProvider(provider.id, modality);
         byProvider[provider.id] = count;
         synced += count;
       } catch (err) {
