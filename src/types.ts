@@ -101,6 +101,7 @@ export interface ModelInfo {
   id: string;
   provider: string;
   name: string;
+  description?: string;
   modality: Modality;
   local: boolean;
   cost: { price: number; unit: string };

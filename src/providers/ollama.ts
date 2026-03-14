@@ -111,6 +111,43 @@ async function fetchJson(url: string, options?: RequestInit & { timeoutMs?: numb
   }
 }
 
+async function fetchOllamaDescriptions(): Promise<Map<string, string>> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5000);
+  try {
+    const res = await fetch('https://ollama.com/library', { signal: controller.signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const html = await res.text();
+    const descriptions = new Map<string, string>();
+
+    // Match model cards: <a href="/library/{name}">...<p>{description}</p>...
+    // Use a regex that finds each library link and captures the model name,
+    // then looks ahead for the first <p>...</p> within that card.
+    const cardRegex = /href="\/library\/([^"]+)"[\s\S]*?<p[^>]*>([\s\S]*?)<\/p>/g;
+    let match: RegExpExecArray | null;
+    while ((match = cardRegex.exec(html)) !== null) {
+      const modelName = match[1].trim();
+      // Clean HTML tags and decode entities from the description
+      const desc = match[2]
+        .replace(/<[^>]*>/g, '')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (modelName && desc) {
+        descriptions.set(modelName, desc);
+      }
+    }
+
+    return descriptions;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export class OllamaProvider implements NoosphereProvider {
   readonly id = 'ollama';
   readonly name = 'Ollama (Local)';
@@ -141,11 +178,12 @@ export class OllamaProvider implements NoosphereProvider {
   async listModels(_modality?: Modality): Promise<ModelInfo[]> {
     if (_modality && _modality !== 'llm') return [];
 
-    // Fetch all three sources in parallel, fail silently
-    const [localData, catalogData, runningData] = await Promise.all([
+    // Fetch all four sources in parallel, fail silently
+    const [localData, catalogData, runningData, descriptions] = await Promise.all([
       fetchJson(`${this.baseUrl}/api/tags`, { timeoutMs: 5000 }).catch(() => null),
       fetchJson('https://ollama.com/api/tags', { timeoutMs: 5000 }).catch(() => null),
       fetchJson(`${this.baseUrl}/api/ps`, { timeoutMs: 5000 }).catch(() => null),
+      fetchOllamaDescriptions().catch(() => new Map<string, string>()),
     ]);
 
     const runningNames = new Set<string>();
@@ -163,7 +201,7 @@ export class OllamaProvider implements NoosphereProvider {
     if (localData?.models) {
       for (const m of localData.models) {
         const isRunning = runningNames.has(m.name) || runningNames.has(m.model);
-        models.set(m.name, this.toModelInfo(m, isRunning ? 'running' : 'installed', true));
+        models.set(m.name, this.toModelInfo(m, isRunning ? 'running' : 'installed', true, descriptions));
       }
     }
 
@@ -172,7 +210,7 @@ export class OllamaProvider implements NoosphereProvider {
       for (const m of catalogData.models) {
         const name = m.name;
         if (!models.has(name)) {
-          models.set(name, this.toModelInfo(m, 'available', false));
+          models.set(name, this.toModelInfo(m, 'available', false, descriptions));
         }
       }
     }
@@ -184,15 +222,20 @@ export class OllamaProvider implements NoosphereProvider {
     m: any,
     status: 'installed' | 'available' | 'running',
     isLocal: boolean,
+    descriptions?: Map<string, string>,
   ): ModelInfo {
     const name = m.name ?? m.model ?? 'unknown';
     const family = m.details?.family;
     const logoProvider = inferLogoProvider(name, family);
+    // Look up description by base model name (strip :tag suffix)
+    const baseName = name.split(':')[0];
+    const description = descriptions?.get(baseName);
 
     return {
       id: name,
       provider: 'ollama',
       name,
+      ...(description ? { description } : {}),
       modality: 'llm',
       local: true,
       cost: { price: 0, unit: 'free' },
