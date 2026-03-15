@@ -11,7 +11,7 @@ const FETCH_TIMEOUT_MS = 8000;
 function isImageModel(model: { name?: string; supportedGenerationMethods?: string[] }): boolean {
   const name = model.name ?? '';
   const methods: string[] = model.supportedGenerationMethods ?? [];
-  return methods.includes('generateImages') || name.split('/').pop()?.startsWith('imagen') === true;
+  return methods.includes('predict') && name.split('/').pop()?.startsWith('imagen') === true;
 }
 
 export class GoogleMediaProvider implements NoosphereProvider {
@@ -103,18 +103,18 @@ export class GoogleMediaProvider implements NoosphereProvider {
   }
 
   async image(options: ImageOptions): Promise<NoosphereResult> {
-    const model = options.model ?? 'imagen-3.0-generate-002';
+    const model = options.model ?? 'imagen-4.0-generate-001';
     const start = Date.now();
 
     const body: Record<string, unknown> = {
-      prompt: options.prompt,
-      config: {
-        numberOfImages: 1,
+      instances: [{ prompt: options.prompt }],
+      parameters: {
+        sampleCount: 1,
       },
     };
 
     const res = await fetch(
-      `${GOOGLE_API_BASE}/models/${model}:generateImages?key=${this.apiKey}`,
+      `${GOOGLE_API_BASE}/models/${model}:predict?key=${this.apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -128,7 +128,10 @@ export class GoogleMediaProvider implements NoosphereProvider {
     }
 
     const data = await res.json() as any;
-    const base64 = data?.generatedImages?.[0]?.image?.imageBytes;
+    // predict endpoint returns { predictions: [{ bytesBase64Encoded: "..." }] }
+    // or { generatedImages: [{ image: { imageBytes: "..." } }] }
+    const base64 = data?.predictions?.[0]?.bytesBase64Encoded
+      ?? data?.generatedImages?.[0]?.image?.imageBytes;
 
     if (!base64) {
       throw new Error('Google image generation returned no image data');
