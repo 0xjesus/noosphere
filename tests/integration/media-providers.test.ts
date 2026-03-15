@@ -20,20 +20,23 @@ describe.skipIf(!OPENAI_KEY)('OpenAI Media Provider', () => {
     expect(result).toBe(true);
   });
 
-  it('listModels returns image, tts, and stt models', async () => {
+  it('listModels returns image, video, tts, and stt models', async () => {
     const all = await provider.listModels();
     expect(all.length).toBeGreaterThan(0);
 
     const imageModels = all.filter((m) => m.modality === 'image');
+    const videoModels = all.filter((m) => m.modality === 'video');
     const ttsModels = all.filter((m) => m.modality === 'tts');
     const sttModels = all.filter((m) => m.modality === 'stt');
 
-    console.log(`OpenAI media models: ${imageModels.length} image, ${ttsModels.length} tts, ${sttModels.length} stt`);
+    console.log(`OpenAI media models: ${imageModels.length} image, ${videoModels.length} video, ${ttsModels.length} tts, ${sttModels.length} stt`);
     console.log('Image:', imageModels.map((m) => m.id).join(', '));
+    console.log('Video:', videoModels.map((m) => m.id).join(', '));
     console.log('TTS:', ttsModels.map((m) => m.id).join(', '));
     console.log('STT:', sttModels.map((m) => m.id).join(', '));
 
     expect(imageModels.length).toBeGreaterThan(0);
+    expect(videoModels.length).toBeGreaterThan(0);
     expect(ttsModels.length).toBeGreaterThan(0);
     expect(sttModels.length).toBeGreaterThan(0);
 
@@ -119,21 +122,26 @@ describe.skipIf(!GOOGLE_KEY)('Google Media Provider', () => {
     expect(result).toBe(true);
   });
 
-  it('listModels returns image models', async () => {
+  it('listModels returns image and video models', async () => {
     const all = await provider.listModels();
+    const imageModels = all.filter((m) => m.modality === 'image');
+    const videoModels = all.filter((m) => m.modality === 'video');
 
-    console.log(`Google media models: ${all.length} total`);
+    console.log(`Google media models: ${imageModels.length} image, ${videoModels.length} video`);
     for (const m of all) {
-      console.log(`  ${m.id} — ${m.description?.slice(0, 80) ?? '(no desc)'}`);
+      console.log(`  ${m.id} [${m.modality}] — ${m.description?.slice(0, 80) ?? '(no desc)'}`);
     }
 
     expect(all.length).toBeGreaterThan(0);
-    expect(all.every((m) => m.modality === 'image')).toBe(true);
     expect(all.every((m) => m.provider === 'google-media')).toBe(true);
 
     // Should have Imagen models
-    const imagen = all.find((m) => m.id.includes('imagen'));
+    const imagen = imageModels.find((m) => m.id.includes('imagen'));
     expect(imagen).toBeDefined();
+
+    // Should have Veo models
+    const veo = videoModels.find((m) => m.id.includes('veo'));
+    expect(veo).toBeDefined();
   });
 
   it('generates an image with Imagen', async () => {

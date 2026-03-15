@@ -1,23 +1,25 @@
 // src/providers/google-media.ts
 import type { NoosphereProvider } from './base.js';
 import type {
-  Modality, ModelInfo, ImageOptions, NoosphereResult,
+  Modality, ModelInfo, ImageOptions, VideoOptions, NoosphereResult,
 } from '../types.js';
 import { getProviderLogo } from '../logos.js';
 
 const GOOGLE_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 const FETCH_TIMEOUT_MS = 8000;
 
-function isImageModel(model: { name?: string; supportedGenerationMethods?: string[] }): boolean {
-  const name = model.name ?? '';
+function classifyGoogleModel(model: { name?: string; supportedGenerationMethods?: string[] }): Modality | null {
+  const name = (model.name ?? '').replace('models/', '');
   const methods: string[] = model.supportedGenerationMethods ?? [];
-  return methods.includes('predict') && name.split('/').pop()?.startsWith('imagen') === true;
+  if (name.startsWith('imagen') && methods.includes('predict')) return 'image';
+  if (name.startsWith('veo') && methods.includes('predictLongRunning')) return 'video';
+  return null;
 }
 
 export class GoogleMediaProvider implements NoosphereProvider {
   readonly id = 'google-media';
-  readonly name = 'Google (Image Generation)';
-  readonly modalities: Modality[] = ['image'];
+  readonly name = 'Google (Image, Video Generation)';
+  readonly modalities: Modality[] = ['image', 'video'];
   readonly isLocal = false;
 
   private modelsCache: ModelInfo[] | null = null;
@@ -73,9 +75,9 @@ export class GoogleMediaProvider implements NoosphereProvider {
       const models: ModelInfo[] = [];
 
       for (const entry of entries) {
-        if (!isImageModel(entry)) continue;
+        const modality = classifyGoogleModel(entry);
+        if (!modality) continue;
 
-        // Google returns names like "models/imagen-3.0-generate-002"
         const fullName = entry.name ?? '';
         const modelId = fullName.startsWith('models/') ? fullName.slice('models/'.length) : fullName;
 
@@ -83,11 +85,12 @@ export class GoogleMediaProvider implements NoosphereProvider {
           id: modelId,
           provider: 'google-media',
           name: entry.displayName ?? modelId,
-          modality: 'image',
+          modality,
           local: false,
-          cost: { price: 0, unit: 'per_image' },
+          cost: { price: 0, unit: modality === 'video' ? 'per_video' : 'per_image' },
           logo,
           description: entry.description,
+          capabilities: modality === 'video' ? { maxDuration: 8, supportsStreaming: false } : undefined,
         };
         models.push(info);
       }
@@ -153,5 +156,80 @@ export class GoogleMediaProvider implements NoosphereProvider {
         format: 'png',
       },
     };
+  }
+
+  async video(options: VideoOptions): Promise<NoosphereResult> {
+    const model = options.model ?? 'veo-3.0-generate-001';
+    const start = Date.now();
+
+    const body: Record<string, unknown> = {
+      instances: [{ prompt: options.prompt }],
+      parameters: {
+        sampleCount: 1,
+      },
+    };
+    if (options.duration) (body.parameters as any).durationSeconds = options.duration;
+
+    // Veo uses predictLongRunning — returns an operation to poll
+    const res = await fetch(
+      `${GOOGLE_API_BASE}/models/${model}:predictLongRunning?key=${this.apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      },
+    );
+
+    if (!res.ok) {
+      const errorBody = await res.text();
+      throw new Error(`Google video generation failed (${res.status}): ${errorBody}`);
+    }
+
+    const operation = await res.json() as any;
+    const operationName = operation?.name;
+
+    if (!operationName) {
+      throw new Error('Google video generation returned no operation name');
+    }
+
+    // Poll the operation until done (max 5 minutes)
+    const deadline = Date.now() + 300000;
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 5000));
+
+      const pollRes = await fetch(
+        `${GOOGLE_API_BASE}/${operationName}?key=${this.apiKey}`,
+      );
+      if (!pollRes.ok) continue;
+
+      const status = await pollRes.json() as any;
+      if (status.done) {
+        const videoBase64 = status.response?.generatedSamples?.[0]?.video?.bytesBase64Encoded;
+        if (videoBase64) {
+          return {
+            buffer: Buffer.from(videoBase64, 'base64'),
+            provider: 'google-media',
+            model,
+            modality: 'video',
+            latencyMs: Date.now() - start,
+            usage: { cost: 0, unit: 'per_video' },
+            media: { format: 'mp4', duration: options.duration },
+          };
+        }
+        // If no base64, check for URL
+        const videoUrl = status.response?.generatedSamples?.[0]?.video?.uri;
+        return {
+          url: videoUrl,
+          provider: 'google-media',
+          model,
+          modality: 'video',
+          latencyMs: Date.now() - start,
+          usage: { cost: 0, unit: 'per_video' },
+          media: { format: 'mp4', duration: options.duration },
+        };
+      }
+    }
+
+    throw new Error(`Google video generation timed out after 5 minutes`);
   }
 }

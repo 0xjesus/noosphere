@@ -1,7 +1,7 @@
 // src/providers/openai-media.ts
 import type { NoosphereProvider } from './base.js';
 import type {
-  Modality, ModelInfo, ImageOptions, SpeakOptions, NoosphereResult,
+  Modality, ModelInfo, ImageOptions, VideoOptions, SpeakOptions, NoosphereResult,
 } from '../types.js';
 import { getProviderLogo } from '../logos.js';
 
@@ -12,6 +12,7 @@ const FETCH_TIMEOUT_MS = 8000;
 const MODEL_PREFIX_MAP: Array<{ prefix: string; modality: Modality }> = [
   { prefix: 'dall-e-', modality: 'image' },
   { prefix: 'gpt-image-', modality: 'image' },
+  { prefix: 'sora-', modality: 'video' },
   { prefix: 'tts-', modality: 'tts' },
   { prefix: 'whisper-', modality: 'stt' },
 ];
@@ -25,8 +26,8 @@ function classifyModel(id: string): Modality | null {
 
 export class OpenAIMediaProvider implements NoosphereProvider {
   readonly id = 'openai-media';
-  readonly name = 'OpenAI (Image, TTS, STT)';
-  readonly modalities: Modality[] = ['image', 'tts', 'stt'];
+  readonly name = 'OpenAI (Image, Video, TTS, STT)';
+  readonly modalities: Modality[] = ['image', 'video', 'tts', 'stt'];
   readonly isLocal = false;
 
   private modelsCache: ModelInfo[] | null = null;
@@ -216,6 +217,54 @@ export class OpenAIMediaProvider implements NoosphereProvider {
     };
   }
 
+  async video(options: VideoOptions): Promise<NoosphereResult> {
+    const model = options.model ?? 'sora-2';
+    const start = Date.now();
+
+    // Sora uses the /v1/videos/generations endpoint
+    const body: Record<string, unknown> = {
+      model,
+      prompt: options.prompt,
+      n: 1,
+    };
+    if (options.duration) body.duration = options.duration;
+    if (options.width && options.height) body.size = `${options.width}x${options.height}`;
+
+    const res = await fetch(`${OPENAI_API_BASE}/videos/generations`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.apiKey}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const errorBody = await res.text();
+      throw new Error(`OpenAI video generation failed (${res.status}): ${errorBody}`);
+    }
+
+    const data = await res.json() as any;
+    const videoUrl = data?.data?.[0]?.url;
+
+    return {
+      url: videoUrl,
+      provider: 'openai-media',
+      model,
+      modality: 'video',
+      latencyMs: Date.now() - start,
+      usage: {
+        cost: 0,
+        unit: 'per_video',
+      },
+      media: {
+        duration: options.duration,
+        width: options.width,
+        height: options.height,
+      },
+    };
+  }
+
   private getCapabilities(id: string, modality: Modality): ModelInfo['capabilities'] {
     if (modality === 'image') {
       return {
@@ -226,6 +275,12 @@ export class OpenAIMediaProvider implements NoosphereProvider {
     if (modality === 'tts') {
       return {
         voices: ['alloy', 'ash', 'coral', 'echo', 'fable', 'onyx', 'nova', 'sage', 'shimmer'],
+      };
+    }
+    if (modality === 'video') {
+      return {
+        maxDuration: id.includes('pro') ? 20 : 10,
+        supportsStreaming: false,
       };
     }
     if (modality === 'stt') {
