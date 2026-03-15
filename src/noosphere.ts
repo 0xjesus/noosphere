@@ -31,6 +31,7 @@ import { HfLocalProvider } from './providers/hf-local.js';
 import { WhisperLocalProvider } from './providers/whisper-local.js';
 import { AudioCraftProvider } from './providers/audiocraft.js';
 import { OpenAICompatProvider, detectOpenAICompatServers } from './providers/openai-compat.js';
+import { OpenAIMediaProvider } from './providers/openai-media.js';
 
 export class Noosphere {
   private config: ResolvedConfig;
@@ -289,6 +290,10 @@ export class Noosphere {
     const hasAnyLLMKey = Object.values(llmKeys).some(Boolean);
     if (hasAnyLLMKey) {
       this.registry.addProvider(new PiAiProvider(llmKeys));
+    }
+
+    if (keys.openai) {
+      this.registry.addProvider(new OpenAIMediaProvider(keys.openai));
     }
 
     if (keys.fal) {
