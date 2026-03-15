@@ -106,18 +106,23 @@ export class OpenAIMediaProvider implements NoosphereProvider {
   }
 
   async image(options: ImageOptions): Promise<NoosphereResult> {
-    const model = options.model ?? 'dall-e-3';
+    const model = options.model ?? 'gpt-image-1';
     const width = options.width ?? 1024;
     const height = options.height ?? 1024;
     const start = Date.now();
+    const isGptImage = model.startsWith('gpt-image-');
 
     const body: Record<string, unknown> = {
       model,
       prompt: options.prompt,
       n: 1,
       size: `${width}x${height}`,
-      response_format: 'url',
     };
+    // gpt-image-* does not support response_format param; returns b64_json by default
+    // dall-e-* supports response_format and can return URLs
+    if (!isGptImage) {
+      body.response_format = 'url';
+    }
 
     const res = await fetch(`${OPENAI_API_BASE}/images/generations`, {
       method: 'POST',
@@ -134,10 +139,10 @@ export class OpenAIMediaProvider implements NoosphereProvider {
     }
 
     const data = await res.json() as any;
-    const imageUrl = data?.data?.[0]?.url;
+    const item = data?.data?.[0];
 
-    return {
-      url: imageUrl,
+    // gpt-image returns b64_json, dall-e returns url
+    const result: NoosphereResult = {
       provider: 'openai-media',
       model,
       modality: 'image',
@@ -152,6 +157,14 @@ export class OpenAIMediaProvider implements NoosphereProvider {
         format: 'png',
       },
     };
+
+    if (item?.b64_json) {
+      result.buffer = Buffer.from(item.b64_json, 'base64');
+    } else if (item?.url) {
+      result.url = item.url;
+    }
+
+    return result;
   }
 
   async speak(options: SpeakOptions): Promise<NoosphereResult> {

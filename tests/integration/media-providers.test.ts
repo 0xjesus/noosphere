@@ -57,22 +57,38 @@ describe.skipIf(!OPENAI_KEY)('OpenAI Media Provider', () => {
     expect(llmOnly).toHaveLength(0); // No LLM models in this provider
   });
 
-  it('generates an image with DALL-E', async () => {
+  it('generates an image with gpt-image-1 (default)', async () => {
     const result = await provider.image({
       prompt: 'A small red cube on a white background, minimal',
+      width: 1024,
+      height: 1024,
+    });
+
+    console.log('gpt-image-1 result:', { bufferSize: result.buffer?.length, latencyMs: result.latencyMs });
+
+    expect(result.buffer).toBeDefined();
+    expect(result.buffer!.length).toBeGreaterThan(1000);
+    expect(result.provider).toBe('openai-media');
+    expect(result.model).toBe('gpt-image-1');
+    expect(result.modality).toBe('image');
+    expect(result.latencyMs).toBeGreaterThan(0);
+  }, 120000);
+
+  it('generates an image with DALL-E 3', async () => {
+    const result = await provider.image({
+      prompt: 'A small blue sphere on a white background, minimal',
       model: 'dall-e-3',
       width: 1024,
       height: 1024,
     });
 
-    console.log('DALL-E result:', { url: result.url?.slice(0, 80) + '...', latencyMs: result.latencyMs });
+    console.log('DALL-E 3 result:', { url: result.url?.slice(0, 80) + '...', latencyMs: result.latencyMs });
 
     expect(result.url).toBeDefined();
     expect(result.url).toContain('http');
     expect(result.provider).toBe('openai-media');
     expect(result.model).toBe('dall-e-3');
     expect(result.modality).toBe('image');
-    expect(result.latencyMs).toBeGreaterThan(0);
   }, 60000);
 
   it('generates TTS audio', async () => {

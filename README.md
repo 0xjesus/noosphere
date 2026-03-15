@@ -7,6 +7,8 @@ One import. Every model. Every modality.
 ## Features
 
 - **7 modalities** — LLM, image, video, TTS, STT, music, and embeddings
+- **OpenAI image/TTS/STT** — DALL-E 2/3, GPT-Image-1, TTS-1/TTS-1-HD, Whisper — all auto-fetched from your API key
+- **Google Imagen 4.0** — Image generation via Gemini API key — auto-fetched
 - **Always up-to-date models** — Dynamic auto-fetch from ALL provider APIs at runtime (OpenAI, Anthropic, Google, Groq, Mistral, xAI, Cerebras, OpenRouter)
 - **Dynamic descriptions** — Model descriptions fetched from source (Ollama library, HuggingFace READMEs, CivitAI API) — no hardcoded strings
 - **Modality-filtered sync** — `syncModels('llm')` only fetches LLM providers, avoiding unnecessary requests
@@ -38,13 +40,29 @@ const response = await ai.chat({
 });
 console.log(response.content);
 
-// Generate an image
+// Generate an image with GPT-Image-1 (OpenAI) — just needs OPENAI_API_KEY
 const image = await ai.image({
   prompt: 'A sunset over mountains',
+  provider: 'openai-media',
+});
+// image.buffer contains the PNG data
+
+// Generate an image with Imagen 4.0 (Google) — just needs GEMINI_API_KEY
+const googleImage = await ai.image({
+  prompt: 'A sunset over mountains',
+  provider: 'google-media',
+});
+// googleImage.buffer contains the PNG data
+
+// Generate an image with DALL-E 3
+const dalle = await ai.image({
+  prompt: 'A sunset over mountains',
+  provider: 'openai-media',
+  model: 'dall-e-3',
   width: 1024,
   height: 1024,
 });
-console.log(image.url);
+console.log(dalle.url);
 
 // Generate a video
 const video = await ai.video({
@@ -53,7 +71,7 @@ const video = await ai.video({
 });
 console.log(video.url);
 
-// Text-to-speech
+// Text-to-speech with OpenAI TTS — just needs OPENAI_API_KEY
 const audio = await ai.speak({
   text: 'Welcome to Noosphere',
   voice: 'alloy',
@@ -368,6 +386,8 @@ await ai.uninstallModel('deepseek-r1:14b');
 | Provider | Modality | Models | Source | Auto-Detect |
 |---|---|---|---|---|
 | **pi-ai** | LLM | 482 | OpenAI, Anthropic, Google, Groq, Mistral, xAI, OpenRouter, Cerebras | API keys |
+| **openai-media** | image, tts, stt | 10 | GPT-Image-1, DALL-E 2/3, TTS-1/HD, Whisper | `OPENAI_API_KEY` |
+| **google-media** | image | 3 | Imagen 4.0 (generate, ultra, fast) | `GEMINI_API_KEY` |
 | **ollama** | LLM, embedding | 70 | 38 installed + 32 from Ollama web catalog | `localhost:11434` |
 | **hf-local** | image, video, tts, stt, music | 220 | HuggingFace catalog (FLUX, SDXL, Wan2.2, Whisper, MusicGen) | Always (no API key) |
 | **huggingface** | LLM, image, tts | dynamic | HuggingFace Inference API | `HUGGINGFACE_TOKEN` |
@@ -400,11 +420,11 @@ await ai.syncModels();
 
 | Modality | Providers Synced |
 |---|---|
-| `llm` | pi-ai, ollama, openai-compat, huggingface (cloud, needs API key) |
-| `image` | hf-local, comfyui, fal, huggingface (cloud) |
+| `llm` | pi-ai, ollama, openai-compat, huggingface (cloud) |
+| `image` | **openai-media** (GPT-Image-1, DALL-E), **google-media** (Imagen 4.0), hf-local, comfyui, fal, huggingface (cloud) |
 | `video` | hf-local, comfyui, fal |
-| `tts` | hf-local (speech models), fal, piper, kokoro, huggingface (cloud) |
-| `stt` | hf-local, whisper-local |
+| `tts` | **openai-media** (TTS-1, TTS-1-HD), hf-local, fal, piper, kokoro, huggingface (cloud) |
+| `stt` | **openai-media** (Whisper), hf-local, whisper-local |
 | `music` | hf-local (MusicGen, AudioLDM, etc.), audiocraft |
 | `embedding` | ollama |
 
