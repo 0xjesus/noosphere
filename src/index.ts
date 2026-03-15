@@ -35,5 +35,6 @@ export { WhisperLocalProvider } from './providers/whisper-local.js';
 export { AudioCraftProvider } from './providers/audiocraft.js';
 export { OpenAICompatProvider, detectOpenAICompatServers } from './providers/openai-compat.js';
 export { OpenAIMediaProvider } from './providers/openai-media.js';
+export { GoogleMediaProvider } from './providers/google-media.js';
 export type { OpenAICompatConfig } from './providers/openai-compat.js';
 export { PROVIDER_LOGOS, getProviderLogo, getAllProviderLogos, PROVIDER_IDS } from './logos.js';
