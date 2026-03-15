@@ -8,7 +8,7 @@ One import. Every model. Every modality.
 
 - **7 modalities** — LLM, image, video, TTS, STT, music, and embeddings
 - **OpenAI media** — GPT-Image-1/1.5, DALL-E 2/3, Sora 2/Pro (video), TTS-1/HD, Whisper — all auto-fetched from `OPENAI_API_KEY`
-- **Google media** — Imagen 4.0 (image), Veo 2/3/3.1 (video) — all auto-fetched from `GEMINI_API_KEY`
+- **Google media** — Imagen 4.0 (image), Veo 2/3/3.1 (video), Gemini TTS — all auto-fetched from `GEMINI_API_KEY`
 - **Always up-to-date models** — Dynamic auto-fetch from ALL provider APIs at runtime (OpenAI, Anthropic, Google, Groq, Mistral, xAI, Cerebras, OpenRouter)
 - **Dynamic descriptions** — Model descriptions fetched from source (Ollama library, HuggingFace READMEs, CivitAI API) — no hardcoded strings
 - **Modality-filtered sync** — `syncModels('llm')` only fetches LLM providers, avoiding unnecessary requests
@@ -387,7 +387,7 @@ await ai.uninstallModel('deepseek-r1:14b');
 |---|---|---|---|---|
 | **pi-ai** | LLM | 482 | OpenAI, Anthropic, Google, Groq, Mistral, xAI, OpenRouter, Cerebras | API keys |
 | **openai-media** | image, video, tts, stt | 12 | GPT-Image-1/1.5, DALL-E 2/3, Sora 2/Pro, TTS-1/HD, Whisper | `OPENAI_API_KEY` |
-| **google-media** | image, video | 8 | Imagen 4.0 (generate/ultra/fast), Veo 2.0/3.0/3.1 | `GEMINI_API_KEY` |
+| **google-media** | image, video, tts | 10 | Imagen 4.0, Veo 2/3/3.1, Gemini TTS (Flash/Pro) | `GEMINI_API_KEY` |
 | **ollama** | LLM, embedding | 70 | 38 installed + 32 from Ollama web catalog | `localhost:11434` |
 | **hf-local** | image, video, tts, stt, music | 220 | HuggingFace catalog (FLUX, SDXL, Wan2.2, Whisper, MusicGen) | Always (no API key) |
 | **huggingface** | LLM, image, tts | dynamic | HuggingFace Inference API | `HUGGINGFACE_TOKEN` |
@@ -423,7 +423,7 @@ await ai.syncModels();
 | `llm` | pi-ai, ollama, openai-compat, huggingface (cloud) |
 | `image` | **openai-media** (GPT-Image-1, DALL-E), **google-media** (Imagen 4.0), hf-local, comfyui, fal, huggingface (cloud) |
 | `video` | **openai-media** (Sora 2/Pro), **google-media** (Veo 2/3/3.1), hf-local, comfyui, fal |
-| `tts` | **openai-media** (TTS-1, TTS-1-HD), hf-local, fal, piper, kokoro, huggingface (cloud) |
+| `tts` | **openai-media** (TTS-1, TTS-1-HD), **google-media** (Gemini TTS), hf-local, fal, piper, kokoro, huggingface (cloud) |
 | `stt` | **openai-media** (Whisper), hf-local, whisper-local |
 | `music` | hf-local (MusicGen, AudioLDM, etc.), audiocraft |
 | `embedding` | ollama |

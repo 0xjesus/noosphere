@@ -144,6 +144,20 @@ describe.skipIf(!GOOGLE_KEY)('Google Media Provider', () => {
     expect(veo).toBeDefined();
   });
 
+  it('generates TTS audio with Gemini', async () => {
+    const result = await provider.speak({
+      text: 'Hello world',
+      voice: 'Kore',
+    });
+
+    console.log('Google TTS result:', { bufferSize: result.buffer?.length, latencyMs: result.latencyMs });
+
+    expect(result.buffer).toBeDefined();
+    expect(result.buffer!.length).toBeGreaterThan(1000);
+    expect(result.provider).toBe('google-media');
+    expect(result.modality).toBe('tts');
+  }, 30000);
+
   it('generates an image with Imagen', async () => {
     const result = await provider.image({
       prompt: 'A small blue sphere on a white background, minimal',

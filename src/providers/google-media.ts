@@ -1,25 +1,31 @@
 // src/providers/google-media.ts
 import type { NoosphereProvider } from './base.js';
 import type {
-  Modality, ModelInfo, ImageOptions, VideoOptions, NoosphereResult,
+  Modality, ModelInfo, ImageOptions, VideoOptions, SpeakOptions, NoosphereResult,
 } from '../types.js';
 import { getProviderLogo } from '../logos.js';
 
 const GOOGLE_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 const FETCH_TIMEOUT_MS = 8000;
 
+const GOOGLE_TTS_VOICES = [
+  'Aoede', 'Charon', 'Fenrir', 'Kore', 'Puck',
+  'Leda', 'Orus', 'Perseus', 'Zephyr', 'Callirrhoe',
+];
+
 function classifyGoogleModel(model: { name?: string; supportedGenerationMethods?: string[] }): Modality | null {
   const name = (model.name ?? '').replace('models/', '');
   const methods: string[] = model.supportedGenerationMethods ?? [];
   if (name.startsWith('imagen') && methods.includes('predict')) return 'image';
   if (name.startsWith('veo') && methods.includes('predictLongRunning')) return 'video';
+  if (name.includes('-tts') && methods.includes('generateContent')) return 'tts';
   return null;
 }
 
 export class GoogleMediaProvider implements NoosphereProvider {
   readonly id = 'google-media';
-  readonly name = 'Google (Image, Video Generation)';
-  readonly modalities: Modality[] = ['image', 'video'];
+  readonly name = 'Google (Image, Video, TTS)';
+  readonly modalities: Modality[] = ['image', 'video', 'tts'];
   readonly isLocal = false;
 
   private modelsCache: ModelInfo[] | null = null;
@@ -90,7 +96,11 @@ export class GoogleMediaProvider implements NoosphereProvider {
           cost: { price: 0, unit: modality === 'video' ? 'per_video' : 'per_image' },
           logo,
           description: entry.description,
-          capabilities: modality === 'video' ? { maxDuration: 8, supportsStreaming: false } : undefined,
+          capabilities: modality === 'video'
+            ? { maxDuration: 8, supportsStreaming: false }
+            : modality === 'tts'
+              ? { voices: GOOGLE_TTS_VOICES }
+              : undefined,
         };
         models.push(info);
       }
@@ -154,6 +164,63 @@ export class GoogleMediaProvider implements NoosphereProvider {
       },
       media: {
         format: 'png',
+      },
+    };
+  }
+
+  async speak(options: SpeakOptions): Promise<NoosphereResult> {
+    const model = options.model ?? 'gemini-2.5-flash-preview-tts';
+    const voice = options.voice ?? 'Kore';
+    const start = Date.now();
+
+    const body = {
+      contents: [{ parts: [{ text: options.text }] }],
+      generationConfig: {
+        response_modalities: ['AUDIO'],
+        speech_config: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: voice },
+          },
+        },
+      },
+    };
+
+    const res = await fetch(
+      `${GOOGLE_API_BASE}/models/${model}:generateContent?key=${this.apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      },
+    );
+
+    if (!res.ok) {
+      const errorBody = await res.text();
+      throw new Error(`Google TTS failed (${res.status}): ${errorBody}`);
+    }
+
+    const data = await res.json() as any;
+    const inlineData = data?.candidates?.[0]?.content?.parts?.[0]?.inlineData;
+
+    if (!inlineData?.data) {
+      throw new Error('Google TTS returned no audio data');
+    }
+
+    const buffer = Buffer.from(inlineData.data, 'base64');
+
+    return {
+      buffer,
+      provider: 'google-media',
+      model,
+      modality: 'tts',
+      latencyMs: Date.now() - start,
+      usage: {
+        cost: 0,
+        input: options.text.length,
+        unit: 'per_1k_chars',
+      },
+      media: {
+        format: 'wav', // Google returns PCM L16, essentially WAV
       },
     };
   }
