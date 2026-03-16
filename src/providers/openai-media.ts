@@ -31,8 +31,40 @@ export class OpenAIMediaProvider implements NoosphereProvider {
   readonly isLocal = false;
 
   private modelsCache: ModelInfo[] | null = null;
+  private voicesCache: string[] | null = null;
 
   constructor(private apiKey: string) {}
+
+  /** Auto-fetch available TTS voices by sending an invalid voice and parsing the error. */
+  private async fetchVoices(): Promise<string[]> {
+    if (this.voicesCache) return this.voicesCache;
+    try {
+      const res = await fetch(`${OPENAI_API_BASE}/audio/speech`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify({ model: 'tts-1', input: '.', voice: '__discover_voices__' }),
+      });
+      if (!res.ok) {
+        const data = await res.json() as any;
+        const msg: string = data?.error?.message ?? '';
+        // Error is Python-style: {'expected': "'nova', 'shimmer', ... or 'coral'"}
+        // Extract voices from "Input should be 'x', 'y', ... or 'z'"
+        const shouldBe = msg.match(/Input should be ([^"]+)/);
+        if (shouldBe) {
+          const voiceList = shouldBe[1].match(/'([a-z]+)'/g);
+          if (voiceList && voiceList.length > 0) {
+            this.voicesCache = voiceList.map((v) => v.replace(/'/g, ''));
+            return this.voicesCache;
+          }
+        }
+      }
+    } catch { /* fallback below */ }
+    this.voicesCache = [];
+    return this.voicesCache;
+  }
 
   async ping(): Promise<boolean> {
     try {
@@ -74,6 +106,9 @@ export class OpenAIMediaProvider implements NoosphereProvider {
         clearTimeout(timer);
       }
 
+      // Fetch voices in parallel with model parsing
+      const voices = await this.fetchVoices();
+
       const entries: Array<{ id: string; description?: string }> = data?.data ?? [];
       const logo = getProviderLogo('openai');
 
@@ -91,7 +126,7 @@ export class OpenAIMediaProvider implements NoosphereProvider {
           cost: { price: 0, unit: 'per_request' },
           logo,
           description: entry.description,
-          capabilities: this.getCapabilities(entry.id, mod),
+          capabilities: this.getCapabilities(entry.id, mod, voices),
         };
         models.push(info);
       }
@@ -265,7 +300,7 @@ export class OpenAIMediaProvider implements NoosphereProvider {
     };
   }
 
-  private getCapabilities(id: string, modality: Modality): ModelInfo['capabilities'] {
+  private getCapabilities(id: string, modality: Modality, voices?: string[]): ModelInfo['capabilities'] {
     if (modality === 'image') {
       return {
         maxWidth: id.startsWith('dall-e-3') ? 1792 : 1024,
@@ -274,7 +309,7 @@ export class OpenAIMediaProvider implements NoosphereProvider {
     }
     if (modality === 'tts') {
       return {
-        voices: ['alloy', 'ash', 'coral', 'echo', 'fable', 'onyx', 'nova', 'sage', 'shimmer'],
+        voices: voices && voices.length > 0 ? voices : undefined,
       };
     }
     if (modality === 'video') {

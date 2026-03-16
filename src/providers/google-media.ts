@@ -8,10 +8,35 @@ import { getProviderLogo } from '../logos.js';
 const GOOGLE_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 const FETCH_TIMEOUT_MS = 8000;
 
-const GOOGLE_TTS_VOICES = [
-  'Aoede', 'Charon', 'Fenrir', 'Kore', 'Puck',
-  'Leda', 'Orus', 'Perseus', 'Zephyr', 'Callirrhoe',
-];
+/** Auto-fetch available TTS voices by sending an invalid voice and parsing the error. */
+async function fetchGoogleVoices(apiKey: string): Promise<string[]> {
+  try {
+    const res = await fetch(
+      `${GOOGLE_API_BASE}/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: '.' }] }],
+          generationConfig: {
+            response_modalities: ['AUDIO'],
+            speech_config: { voiceConfig: { prebuiltVoiceConfig: { voiceName: '__discover_voices__' } } },
+          },
+        }),
+      },
+    );
+    if (!res.ok) {
+      const data = await res.json() as any;
+      const msg: string = data?.error?.message ?? '';
+      // Parse: "Allowed voice names are: achernar, achird, algenib, ..."
+      const match = msg.match(/Allowed voice names are:\s*(.+)/i);
+      if (match) {
+        return match[1].split(',').map((v) => v.trim()).filter(Boolean);
+      }
+    }
+  } catch { /* fallback */ }
+  return [];
+}
 
 function classifyGoogleModel(model: { name?: string; supportedGenerationMethods?: string[] }): Modality | null {
   const name = (model.name ?? '').replace('models/', '');
@@ -29,6 +54,7 @@ export class GoogleMediaProvider implements NoosphereProvider {
   readonly isLocal = false;
 
   private modelsCache: ModelInfo[] | null = null;
+  private voicesCache: string[] | null = null;
 
   constructor(private apiKey: string) {}
 
@@ -77,6 +103,11 @@ export class GoogleMediaProvider implements NoosphereProvider {
         supportedGenerationMethods?: string[];
       }> = data?.models ?? [];
 
+      // Auto-fetch voices in parallel
+      if (!this.voicesCache) {
+        this.voicesCache = await fetchGoogleVoices(this.apiKey);
+      }
+
       const logo = getProviderLogo('google');
       const models: ModelInfo[] = [];
 
@@ -99,7 +130,7 @@ export class GoogleMediaProvider implements NoosphereProvider {
           capabilities: modality === 'video'
             ? { maxDuration: 8, supportsStreaming: false }
             : modality === 'tts'
-              ? { voices: GOOGLE_TTS_VOICES }
+              ? { voices: this.voicesCache && this.voicesCache.length > 0 ? this.voicesCache : undefined }
               : undefined,
         };
         models.push(info);
