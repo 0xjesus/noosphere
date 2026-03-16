@@ -226,7 +226,7 @@ export class GoogleMediaProvider implements NoosphereProvider {
   }
 
   async video(options: VideoOptions): Promise<NoosphereResult> {
-    const model = options.model ?? 'veo-3.0-generate-001';
+    const model = options.model ?? 'veo-2.0-generate-001';
     const start = Date.now();
 
     const body: Record<string, unknown> = {
@@ -271,10 +271,21 @@ export class GoogleMediaProvider implements NoosphereProvider {
 
       const status = await pollRes.json() as any;
       if (status.done) {
-        const videoBase64 = status.response?.generatedSamples?.[0]?.video?.bytesBase64Encoded;
-        if (videoBase64) {
+        // Check for errors
+        if (status.error) {
+          throw new Error(`Google video generation error: ${status.error.message ?? JSON.stringify(status.error)}`);
+        }
+
+        // Response structure: response.generateVideoResponse.generatedSamples[0].video.uri
+        const resp = status.response ?? {};
+        const samples = resp.generateVideoResponse?.generatedSamples
+          ?? resp.generatedSamples
+          ?? [];
+        const video = samples[0]?.video;
+
+        if (video?.bytesBase64Encoded) {
           return {
-            buffer: Buffer.from(videoBase64, 'base64'),
+            buffer: Buffer.from(video.bytesBase64Encoded, 'base64'),
             provider: 'google-media',
             model,
             modality: 'video',
@@ -283,17 +294,36 @@ export class GoogleMediaProvider implements NoosphereProvider {
             media: { format: 'mp4', duration: options.duration },
           };
         }
-        // If no base64, check for URL
-        const videoUrl = status.response?.generatedSamples?.[0]?.video?.uri;
-        return {
-          url: videoUrl,
-          provider: 'google-media',
-          model,
-          modality: 'video',
-          latencyMs: Date.now() - start,
-          usage: { cost: 0, unit: 'per_video' },
-          media: { format: 'mp4', duration: options.duration },
-        };
+
+        if (video?.uri) {
+          // Download the video from the URI (follows redirects)
+          const separator = video.uri.includes('?') ? '&' : '?';
+          const videoRes = await fetch(`${video.uri}${separator}key=${this.apiKey}`, { redirect: 'follow' });
+          if (videoRes.ok) {
+            const buffer = Buffer.from(await videoRes.arrayBuffer());
+            return {
+              buffer,
+              provider: 'google-media',
+              model,
+              modality: 'video',
+              latencyMs: Date.now() - start,
+              usage: { cost: 0, unit: 'per_video' },
+              media: { format: 'mp4', duration: options.duration },
+            };
+          }
+          // If download fails, return the URI
+          return {
+            url: video.uri,
+            provider: 'google-media',
+            model,
+            modality: 'video',
+            latencyMs: Date.now() - start,
+            usage: { cost: 0, unit: 'per_video' },
+            media: { format: 'mp4', duration: options.duration },
+          };
+        }
+
+        throw new Error('Google video generation completed but returned no video data');
       }
     }
 
