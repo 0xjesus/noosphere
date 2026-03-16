@@ -32,7 +32,8 @@
   "dependencies": {
     "@fal-ai/client": "^1.2.0",
     "@huggingface/inference": "^3.6.0",
-    "@mariozechner/pi-ai": "^0.5.10"
+    "@mariozechner/pi-ai": "^0.5.10",
+    "tiktoken": "^1.0.22"
   },
   "devDependencies": {
     "@dotenvx/dotenvx": "^1.54.1",

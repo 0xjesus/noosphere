@@ -18,6 +18,7 @@ import type {
 } from './types.js';
 import { NoosphereError } from './errors.js';
 import { resolveConfig, type ResolvedConfig } from './config.js';
+import { countTokens, type TokenCountOptions, type TokenCountResult } from './token-counter.js';
 import { Registry } from './registry.js';
 import { UsageTracker } from './tracking.js';
 import type { NoosphereProvider } from './providers/base.js';
@@ -228,6 +229,12 @@ export class Noosphere {
 
   getUsage(options?: UsageQueryOptions): UsageSummary {
     return this.tracker.getSummary(options);
+  }
+
+  async countTokens(options: TokenCountOptions): Promise<TokenCountResult> {
+    const keys: Record<string, string> = {};
+    if (this.config.keys?.google) keys.google = this.config.keys.google;
+    return countTokens(options, keys);
   }
 
   // --- Local Model Management ---
