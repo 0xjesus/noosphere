@@ -16,6 +16,8 @@ One import. Every model. Every modality.
 - **30+ HuggingFace tasks** — LLM, image, TTS, translation, summarization, classification, and more
 - **Local-first architecture** — Auto-detects Ollama, ComfyUI, Whisper, AudioCraft, Piper, and Kokoro on your machine
 - **Org-aware logos** — HuggingFace models show the real org logo (Meta, Google, NVIDIA) instead of generic HF logo
+- **Pre-request token counting** — Count tokens before sending, for ALL providers (OpenAI/Groq/Ollama via tiktoken, Google/Anthropic via API)
+- **Full pi-ai access** — Agent loop with tool calling, preprocessor (compaction hook), `calculateCost`, direct stream/complete APIs — all re-exported
 - **Agentic capabilities** — Tool use, function calling, reasoning/thinking, vision, and agent loops via Pi-AI
 - **Failover & retry** — Automatic retries with exponential backoff and cross-provider failover
 - **Usage tracking** — Real-time cost, latency, and token tracking across all providers
@@ -626,6 +628,102 @@ Noosphere auto-detects all local runtimes on startup:
 | AudioCraft | Python package detection | — |
 
 > 📄 **Full research:** [`docs/LOCAL_AI_RESEARCH.md`](./docs/LOCAL_AI_RESEARCH.md) — 44KB covering 12+ runtimes across all modalities
+
+---
+
+## Pre-Request Token Counting
+
+Count tokens **before** sending a request to any provider. Know the cost upfront.
+
+```typescript
+// Via Noosphere instance (auto-routes by model)
+const result = await ai.countTokens({
+  messages: [
+    { role: 'system', content: 'You are a helpful assistant.' },
+    { role: 'user', content: 'Explain quantum computing.' },
+  ],
+  model: 'gpt-4o',
+});
+console.log(result.tokens);   // 26
+console.log(result.method);   // "tiktoken" (instant, local)
+console.log(result.provider); // "openai"
+
+// Google — exact count via API
+const google = await ai.countTokens({
+  messages: [{ role: 'user', content: 'Hello!' }],
+  model: 'gemini-2.5-flash',
+});
+console.log(google.tokens);   // 3
+console.log(google.method);   // "api" (exact)
+```
+
+**Token counting by provider:**
+
+| Provider | Method | Speed | Accuracy |
+|---|---|---|---|
+| **OpenAI** (GPT-4o, o1, o3, o4, GPT-5) | tiktoken (local) | Instant | Exact |
+| **Google** (Gemini) | `/countTokens` API | ~200ms | Exact |
+| **Anthropic** (Claude) | `/messages/count_tokens` API | ~200ms | Exact |
+| **Groq** (Llama, Mixtral, Gemma) | tiktoken (local) | Instant | Exact |
+| **Cerebras** (Llama) | tiktoken (local) | Instant | Exact |
+| **Mistral** (Mistral, Mixtral, Codestral) | tiktoken (local) | Instant | Close approx |
+| **xAI** (Grok) | tiktoken (local) | Instant | Close approx |
+| **OpenRouter** (all models) | tiktoken (local) | Instant | Close approx |
+| **Ollama** (all local models) | tiktoken (local) | Instant | Close approx |
+
+You can also use standalone functions without a Noosphere instance:
+
+```typescript
+import {
+  countTokensOpenAI, countTokensGoogle, countTokensAnthropic,
+  countTokensGroq, countTokensMistral, countTokensXai,
+  countTokensCerebras, countTokensOpenRouter, countTokensOllama,
+} from 'noosphere';
+
+// Local (instant, no API key needed)
+const tokens = countTokensOpenAI(messages, 'gpt-4o');       // 26
+const groq   = countTokensGroq(messages, 'llama-3.3-70b');  // 26
+const ollama = countTokensOllama(messages, 'qwen3:8b');     // 26
+
+// API-based (exact, needs key)
+const google = await countTokensGoogle(messages, GEMINI_KEY, 'gemini-2.5-flash');     // 16
+const claude = await countTokensAnthropic(messages, ANTHROPIC_KEY, 'claude-sonnet-4-20250514'); // exact
+```
+
+---
+
+## Agent Loop & pi-ai Access
+
+Noosphere re-exports the full [pi-ai](https://github.com/nicholasgriffintn/pi-ai) library for direct access to agent loops, tool calling, cost calculation, and streaming APIs.
+
+```typescript
+import {
+  agentLoop, calculateCost,
+  piStream, piComplete, piStreamSimple, piCompleteSimple,
+  setApiKey, getApiKey, getPiModel, getPiModels, getPiProviders,
+} from 'noosphere';
+
+// Agent loop with tool calling and preprocessor (compaction hook)
+import type { AgentLoopConfig, AgentContext, AgentTool } from 'noosphere';
+
+const config: AgentLoopConfig = {
+  model: getPiModel('openai', 'gpt-4o'),
+  // Preprocessor runs before each LLM call — use for context compaction
+  preprocessor: async (messages) => {
+    // Truncate old messages, summarize, etc.
+    if (messages.length > 50) {
+      return messages.slice(-20); // keep last 20
+    }
+    return messages;
+  },
+};
+
+// Calculate cost before sending
+const model = getPiModel('openai', 'gpt-4o');
+const usage = { input: 1000, output: 500, cacheRead: 0, cacheWrite: 0 };
+const cost = calculateCost(model, usage);
+console.log(cost.total); // $0.00625
+```
 
 ---
 
