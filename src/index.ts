@@ -38,8 +38,12 @@ export { OpenAIMediaProvider } from './providers/openai-media.js';
 export { GoogleMediaProvider } from './providers/google-media.js';
 export type { OpenAICompatConfig } from './providers/openai-compat.js';
 export { PROVIDER_LOGOS, getProviderLogo, getAllProviderLogos, PROVIDER_IDS } from './logos.js';
-export { countTokens, countTokensOpenAI, countTokensGoogle, countTokensAnthropic } from './token-counter.js';
-export type { TokenCountResult, TokenCountOptions } from './token-counter.js';
+export {
+  countTokens, countTokensOpenAI, countTokensGoogle, countTokensAnthropic,
+  countTokensGroq, countTokensMistral, countTokensXai, countTokensCerebras,
+  countTokensOpenRouter, countTokensOllama,
+} from './token-counter.js';
+export type { TokenCountResult, TokenCountOptions, TokenCountProvider } from './token-counter.js';
 
 // --- Re-export pi-ai for direct access ---
 // Agent loop with tool calling, preprocessor (compaction), and message queuing

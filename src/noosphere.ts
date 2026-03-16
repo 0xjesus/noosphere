@@ -234,6 +234,7 @@ export class Noosphere {
   async countTokens(options: TokenCountOptions): Promise<TokenCountResult> {
     const keys: Record<string, string> = {};
     if (this.config.keys?.google) keys.google = this.config.keys.google;
+    if (this.config.keys?.anthropic) keys.anthropic = this.config.keys.anthropic;
     return countTokens(options, keys);
   }
 
