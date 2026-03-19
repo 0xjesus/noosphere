@@ -694,35 +694,181 @@ const claude = await countTokensAnthropic(messages, ANTHROPIC_KEY, 'claude-sonne
 
 ## Agent Loop & pi-ai Access
 
-Noosphere re-exports the full [pi-ai](https://github.com/nicholasgriffintn/pi-ai) library for direct access to agent loops, tool calling, cost calculation, and streaming APIs.
+Noosphere re-exports the full [pi-ai](https://github.com/mariozechner/pi-ai) library for direct access to agent loops, tool calling, cost calculation, and streaming APIs.
+
+### Preprocessor — Context Compaction
+
+The preprocessor hook runs **before every LLM call** in the agent loop. Use it to manage context window limits — truncate old messages, summarize conversations, or implement sliding window strategies.
 
 ```typescript
-import {
-  agentLoop, calculateCost,
-  piStream, piComplete, piStreamSimple, piCompleteSimple,
-  setApiKey, getApiKey, getPiModel, getPiModels, getPiProviders,
-} from 'noosphere';
+import { agentLoop, getPiModel, setApiKey, countTokensOpenAI } from 'noosphere';
+import type { AgentLoopConfig, AgentContext, PiMessage } from 'noosphere';
 
-// Agent loop with tool calling and preprocessor (compaction hook)
-import type { AgentLoopConfig, AgentContext, AgentTool } from 'noosphere';
+setApiKey('openai', process.env.OPENAI_API_KEY!);
 
 const config: AgentLoopConfig = {
   model: getPiModel('openai', 'gpt-4o'),
-  // Preprocessor runs before each LLM call — use for context compaction
+
+  // Preprocessor runs before each LLM call
   preprocessor: async (messages) => {
-    // Truncate old messages, summarize, etc.
+    // Strategy 1: Simple sliding window — keep last N messages
     if (messages.length > 50) {
-      return messages.slice(-20); // keep last 20
+      return messages.slice(-20);
     }
     return messages;
   },
 };
 
-// Calculate cost before sending
+// Start the agent loop
+const context: AgentContext = {
+  systemPrompt: 'You are a helpful assistant.',
+  messages: [],
+};
+
+const userMessage = {
+  role: 'user' as const,
+  content: 'Hello!',
+  timestamp: Date.now(),
+};
+
+const stream = agentLoop(userMessage, context, config);
+
+for await (const event of stream) {
+  if (event.type === 'message_update' && event.assistantMessageEvent.type === 'text_delta') {
+    process.stdout.write(event.assistantMessageEvent.delta);
+  }
+}
+```
+
+#### Preprocessor Strategies
+
+**Token-aware compaction** — count tokens and trim to fit the context window:
+
+```typescript
+preprocessor: async (messages) => {
+  const model = getPiModel('openai', 'gpt-4o');
+  const maxTokens = model.contextWindow * 0.8; // leave 20% for response
+
+  let totalTokens = 0;
+  const kept: PiMessage[] = [];
+
+  // Keep messages from newest to oldest until we hit the limit
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    const content = 'content' in msg && typeof msg.content === 'string' ? msg.content : '';
+    const msgTokens = countTokensOpenAI([{ role: msg.role, content }], 'gpt-4o');
+
+    if (totalTokens + msgTokens > maxTokens) break;
+    totalTokens += msgTokens;
+    kept.unshift(msg);
+  }
+
+  return kept;
+},
+```
+
+**Summarization compaction** — summarize old messages, keep recent ones:
+
+```typescript
+preprocessor: async (messages) => {
+  if (messages.length <= 20) return messages;
+
+  // Summarize the older messages using the LLM itself
+  const oldMessages = messages.slice(0, -10);
+  const recentMessages = messages.slice(-10);
+
+  const summary = await piCompleteSimple(getPiModel('openai', 'gpt-4o-mini'), {
+    systemPrompt: 'Summarize this conversation in 2-3 sentences.',
+    messages: oldMessages,
+  });
+
+  // Replace old messages with a summary message
+  const summaryText = summary.content
+    .filter((c): c is { type: 'text'; text: string } => c.type === 'text')
+    .map((c) => c.text)
+    .join('');
+
+  return [
+    { role: 'user' as const, content: `[Previous conversation summary: ${summaryText}]`, timestamp: Date.now() },
+    ...recentMessages,
+  ];
+},
+```
+
+### Tool Calling
+
+Define tools for the agent loop with typed parameters:
+
+```typescript
+import { Type } from '@sinclair/typebox';
+import type { AgentTool } from 'noosphere';
+
+const weatherTool: AgentTool = {
+  name: 'get_weather',
+  label: 'Get Weather',
+  description: 'Get the current weather for a location',
+  parameters: Type.Object({
+    location: Type.String({ description: 'City name' }),
+  }),
+  execute: async (toolCallId, params) => {
+    const weather = await fetchWeather(params.location);
+    return { output: JSON.stringify(weather), details: weather };
+  },
+};
+
+const context: AgentContext = {
+  systemPrompt: 'You are a helpful assistant with weather access.',
+  messages: [],
+  tools: [weatherTool],
+};
+
+const stream = agentLoop(userMessage, context, config);
+
+for await (const event of stream) {
+  if (event.type === 'tool_execution_start') {
+    console.log(`Calling ${event.toolName}...`);
+  }
+  if (event.type === 'tool_execution_end') {
+    console.log(`Result: ${event.result}`);
+  }
+}
+```
+
+### Cost Calculation
+
+```typescript
+import { calculateCost, getPiModel } from 'noosphere';
+
 const model = getPiModel('openai', 'gpt-4o');
 const usage = { input: 1000, output: 500, cacheRead: 0, cacheWrite: 0 };
 const cost = calculateCost(model, usage);
-console.log(cost.total); // $0.00625
+console.log(cost.total);  // $0.00625
+console.log(cost.input);  // $0.0025
+console.log(cost.output); // $0.00375
+```
+
+### Direct Stream/Complete APIs
+
+```typescript
+import { piComplete, piStream, piCompleteSimple, setApiKey, getPiModel } from 'noosphere';
+
+setApiKey('openai', process.env.OPENAI_API_KEY!);
+const model = getPiModel('openai', 'gpt-4o');
+
+// Simple completion
+const result = await piCompleteSimple(model, {
+  systemPrompt: 'You are helpful.',
+  messages: [{ role: 'user', content: 'Hello!', timestamp: Date.now() }],
+});
+
+// Streaming
+const stream = piStream(model, {
+  messages: [{ role: 'user', content: 'Hello!', timestamp: Date.now() }],
+});
+
+for await (const event of stream) {
+  if (event.type === 'text_delta') process.stdout.write(event.delta);
+}
 ```
 
 ---
